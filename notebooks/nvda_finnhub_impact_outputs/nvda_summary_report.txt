@@ -1,0 +1,38 @@
+=== NVDA Stock Sentiment Impact Summary ===
+
+Overall, the strongest correlation between news sentiment and stock price change is at a lag of 7 trading days.
+Correlation coefficient at this lag: 0.181
+
+Number of articles with valid impact data: 231
+
+Showing 5 example news impacts:
+
+- News Date: 2025-04-28
+  Impact Date (30 trading days later): N/A
+  Headline: Nvidia stock falls as China's Huawei reportedly readies AI chip after Trump's export ban
+  Price Change: 32.40%
+
+- News Date: 2025-04-30
+  Impact Date (30 trading days later): N/A
+  Headline: Trump’s Next Move on Nvidia Could Be a Costly Mistake
+  Price Change: 33.13%
+
+- News Date: 2025-04-25
+  Impact Date (30 trading days later): N/A
+  Headline: 1 Wall Street Analyst Thinks Nvidia Stock Is Going to $150. Is It a Buy?
+  Price Change: 28.48%
+
+- News Date: 2025-04-30
+  Impact Date (30 trading days later): N/A
+  Headline: Billionaires Sell Nvidia Stock Before the Market Crash and Buy a Golden ETF Up 166% in 10 Years
+  Price Change: 33.13%
+
+- News Date: 2025-04-29
+  Impact Date (30 trading days later): N/A
+  Headline: 2 Artificial Intelligence (AI) Stocks That Could Make You a Millionaire
+  Price Change: 31.02%
+
+Note: Price change is calculated as the percentage change in closing price relative to the closing price on or just after the news publication date.
+The impact delay (lag) indicates how many trading days after news publication the stock price shows the strongest per-article reaction.
+
+Detailed impact summary saved to: ./nvda_finnhub_impact_outputs/nvda_summary_report.txt

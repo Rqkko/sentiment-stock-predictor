@@ -10,3 +10,23 @@ tabulate
 scikit-learn
 torch
 tensorflow
+transformers
+finnhub-python
+sentence-transformers
+sentencepiece
+tokenizers
+tf-keras
+tqdm
+
+
+selenium
+webdriver-manager
+python-dateutil
+# for sentence-transformer need python 3.11
+#   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+#   export PATH="$HOME/.cargo/bin:$PATH"
+#   rustc --version
+#   brew install cmake
+#   cmake --version
+#   pip install --upgrade pip setuptools wheel
+#   pip install --no-cache-dir sentencepiece tokenizers sentence-transformers
