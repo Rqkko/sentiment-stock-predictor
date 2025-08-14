@@ -17,11 +17,7 @@ sentencepiece
 tokenizers
 tf-keras
 tqdm
-
-
-selenium
-webdriver-manager
-python-dateutil
+scipy 
 # for sentence-transformer need python 3.11
 #   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 #   export PATH="$HOME/.cargo/bin:$PATH"
