@@ -7,30 +7,35 @@ Number of articles with valid impact data: 3044
 
 Showing 5 example news impacts:
 
-- News Date: 2025-03-21
-  Impact Date (14 trading days later): 2025-04-10
-  Headline: The Score: Nvidia, Tesla, Nike and More Stocks That Defined the Week
-  Price Change: -8.61%
+- Lag days: 11 days, 0:00:00
+  News Date: 2025-03-27
+  Impact Date (7 trading days later): 2025-04-07
+  Headline: Bank of America: NVDA Will Ultimately Head Higher, Driven by Very Strong Fundamentals
+  Price Change: -12.38%
 
-- News Date: 2025-01-04
-  Impact Date (14 trading days later): 2025-01-28
-  Headline: Analysts make Nvidia, AMD predictions ahead of Consumer Electronics Show
-  Price Change: -13.68%
+- Lag days: 1 day, 0:00:00
+  News Date: 2025-03-13
+  Impact Date (1 trading days later): 2025-03-14
+  Headline: Taiwan Semiconductor: Company Is Selling The Shovels To The AI Race
+  Price Change: 5.27%
 
-- News Date: 2025-03-21
-  Impact Date (14 trading days later): 2025-04-10
-  Headline: Nvidia and Pasqal: combining two technologies
-  Price Change: -8.61%
+- Lag days: 43 days, 0:00:00
+  News Date: 2025-02-06
+  Impact Date (30 trading days later): 2025-03-21
+  Headline: Most large cryptocurrencies decrease on Solana, XRP drops
+  Price Change: -8.52%
 
-- News Date: 2025-01-09
-  Impact Date (14 trading days later): 2025-01-31
-  Headline: Cerence Inc. (CRNC): Among The Companies That Partnered With NVIDIA This Month
-  Price Change: -11.65%
+- Lag days: 12 days, 0:00:00
+  News Date: 2025-02-07
+  Impact Date (7 trading days later): 2025-02-19
+  Headline: Large cryptocurrencies rise as XRP increases
+  Price Change: 7.23%
 
-- News Date: 2025-04-25
-  Impact Date (30 trading days later): 2025-06-09
-  Headline: 2 Vanguard ETFs That Have Crushed the Market This Year
-  Price Change: 28.48%
+- Lag days: 18 days, 0:00:00
+  News Date: 2025-03-03
+  Impact Date (14 trading days later): 2025-03-21
+  Headline: Nvidia’s stock sinks, wiping out six months of gains as the AI trade unravels
+  Price Change: 3.20%
 
 Note: Price change is calculated as the percentage change in closing price relative to the closing price on or just after the news publication date.
 The impact delay (lag) indicates how many trading days after news publication the stock price shows the strongest per-article reaction.
