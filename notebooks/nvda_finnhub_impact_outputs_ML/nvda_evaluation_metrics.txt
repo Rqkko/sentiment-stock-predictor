@@ -1,0 +1,16 @@
+=== NVDA Sentiment Model Evaluation ===
+
+Samples evaluated: 3044
+
+Accuracy: 0.386
+Precision (macro): 0.342
+Recall (macro): 0.263
+F1 Score (macro): 0.286
+Mean Absolute Error (labels): 1.007
+
+Confusion Matrix (rows=true, cols=predicted) [order: -1, 0, 1]:
+[[455 323 849]
+ [  0   0   0]
+ [349 347 721]]
+
+Cumulative return from naive trading: -99.99%
