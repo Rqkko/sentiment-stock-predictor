@@ -397,7 +397,7 @@ print(f"Saved per-article lagged results -> {out_path}, Processed articles: {len
 
 # # Analysis
 
-# In[45]:
+# In[91]:
 
 
 # ================================
@@ -480,7 +480,7 @@ else:
     print("No valid lag results to save.")
 
 
-# In[46]:
+# In[92]:
 
 
 # -------------------------
@@ -502,7 +502,7 @@ df_results.to_csv(os.path.join(OUT_DIR, "nvda_news_lagged_results_with_bestlag.c
 print("Saved per-article best-lag file.")
 
 
-# In[47]:
+# In[93]:
 
 
 # -------------------------
@@ -530,7 +530,7 @@ print("Plots saved in", OUT_DIR)
 print("Done.")
 
 
-# In[48]:
+# In[94]:
 
 
 # --------- load prerequisites from disk (so we don't need steps 1–3) ---------
@@ -538,7 +538,7 @@ df_results = pd.read_csv(os.path.join(OUT_DIR, "nvda_news_lagged_results.csv"))
 df_price   = pd.read_csv(os.path.join(OUT_DIR, "price_data.csv"))
 
 
-# In[49]:
+# In[95]:
 
 
 # ================================
@@ -645,327 +645,104 @@ print("Feature panel 'feat' ready. Shape:", feat.shape)
 print("Columns:", feat.columns.tolist())
 
 
-# In[ ]:
-
-
-# # ================================
-# # 9) Binary direction labels (UP / DOWN)
-# # ================================
-
-# # Choose the horizon (in trading days ahead)
-# H_BIN = 5   # you can change to 3, 5, 10 later
-
-# label_col_3class = f"label_dir_{H_BIN}d"
-# if label_col_3class not in feat.columns:
-#     raise ValueError(f"{label_col_3class} not found in feat. Run the feature-engineering cell first.")
-
-# # Work on a copy so we don't mess up 'feat'
-# bin_df = feat.copy()
-
-# # Filter out neutral days (label_dir == 0)
-# mask_non_neutral = bin_df[label_col_3class] != 0
-# bin_df = bin_df.loc[mask_non_neutral].copy()
-
-# print(f"Total days before neutral filter: {len(feat)}")
-# print(f"Total days after removing neutral band: {len(bin_df)}")
-
-# # Map -1 -> 0 (down), +1 -> 1 (up)
-# bin_df["y_bin"] = bin_df[label_col_3class].map({-1: 0, 1: 1})
-
-# # Sanity check
-# print("Class distribution (0=down, 1=up):")
-# print(bin_df["y_bin"].value_counts())
-
-
-# In[59]:
+# In[96]:
 
 
 # ================================
-# 10) Feature matrix & time-based split
+# 8b) Simple binary labels (no neutral band)
 # ================================
 
-# Feature columns to use
-FEAT_BIN_COLS = [
-    "ret_1d", "ret_5d", "ret_10d",
-    "vol_10d", "vol_20d",
-    "sent_net_mean", "sent_net_sum",
-    "sent_pos_mean", "sent_neg_mean", "n_articles"
-]
+# 1-day ahead binary label: 1 if next-day return > 0, else 0
+feat["y_bin_1d"] = (feat["label_ret_1d"] > 0).astype(int)
 
-# Ensure all features exist
-missing_cols = [c for c in FEAT_BIN_COLS if c not in bin_df.columns]
-if missing_cols:
-    raise ValueError(f"Missing feature columns for binary model: {missing_cols}")
-
-# Sort by date index to respect time ordering
-bin_df = bin_df.sort_index()
-
-X = bin_df[FEAT_BIN_COLS].values
-y = bin_df["y_bin"].values
-
-# Time-based split: first 80% train, last 20% test
-split_idx = int(len(bin_df) * 0.8)
-X_train, X_test = X[:split_idx], X[split_idx:]
-y_train, y_test = y[:split_idx], y[split_idx:]
-
-print(f"Train size: {len(X_train)}")
-print(f"Test size:  {len(X_test)}")
+print("Binary 1-day label created: y_bin_1d")
+print(feat["y_bin_1d"].value_counts())
+print("\nClass distribution (%):")
+print(feat["y_bin_1d"].value_counts(normalize=True).round(3))
 
 
-# In[ ]:
+# In[97]:
 
 
 # ================================
-# 11) Binary direction model (Logistic Regression)
+# 10) Feature matrix X and target y (H = 1d)
 # ================================
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    confusion_matrix,
-    classification_report,
-    roc_auc_score
-)
-from sklearn.model_selection import train_test_split
 
-# --- 11.1: Choose prediction horizon and build binary labels ---
-
-H = 1  # predict 1-day-ahead direction; change to 3,5,10 if you like
-target_col = f"label_dir_{H}d"
-
-if target_col not in feat.columns:
-    raise ValueError(f"{target_col} not found in feat. Available label_dir_* columns: "
-                     f"{[c for c in feat.columns if 'label_dir_' in c]}")
-
-# label_dir_* is in {-1, 0, +1}; drop neutral 0 for pure up/down
-df_bin = feat.loc[feat[target_col] != 0].copy()
-
-# Binary target: 1 = UP, 0 = DOWN
-y = (df_bin[target_col] == 1).astype(int)
-
-# --- 11.2: Select features (price + sentiment + volume, etc.) ---
-
+# Choose features: price history + volatility + sentiment + news intensity
 feature_cols = [
-    "ret_1d", "ret_5d", "ret_10d",
-    "vol_10d", "vol_20d",
-    "sent_net_mean", "sent_net_sum",
-    "sent_pos_mean", "sent_neg_mean",
+    "ret_1d",
+    "ret_5d",
+    "ret_10d",
+    "vol_10d",
+    "vol_20d",
+    "sent_net_mean",
+    "sent_net_sum",
+    "sent_pos_mean",
+    "sent_neg_mean",
     "n_articles",
 ]
 
-missing_feats = [c for c in feature_cols if c not in df_bin.columns]
-if missing_feats:
-    raise ValueError(f"Missing feature columns in df_bin: {missing_feats}")
+# Ensure all required columns exist
+missing = [c for c in feature_cols if c not in bin_df.columns]
+if missing:
+    raise ValueError(f"Missing feature columns in bin_df: {missing}")
 
-X = df_bin[feature_cols].copy()
+# Drop rows with NaNs in features or target
+bin_df_model = bin_df.dropna(subset=feature_cols + ["y_bin"]).copy()
 
-# Safety: drop any remaining rows with NaNs in X or y
-mask_valid = X.notna().all(axis=1) & y.notna()
-X = X.loc[mask_valid]
-y = y.loc[mask_valid]
+print("Final modeling dataset shape:", bin_df_model.shape)
 
-# --- 11.3: Time-respecting train/test split (no shuffling) ---
+# Design X and y
+X = bin_df_model[feature_cols].values
+y = bin_df_model["y_bin"].values
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y,
-    test_size=0.2,
-    shuffle=False  # keep chronological order to avoid look-ahead bias
+# Simple time-based split: first 80% train, last 20% test
+n = len(bin_df_model)
+split_idx = int(n * 0.8)
+
+X_train, X_test = X[:split_idx], X[split_idx:]
+y_train, y_test = y[:split_idx], y[split_idx:]
+
+print(f"Train size: {len(y_train)}, Test size: {len(y_test)}")
+print("Train class distribution:", pd.Series(y_train).value_counts().to_dict())
+print("Test class distribution:", pd.Series(y_test).value_counts().to_dict())
+
+
+# In[98]:
+
+
+# ================================
+# 12) Binary Direction (H=1d) — Random Forest baseline
+# ================================
+from sklearn.ensemble import RandomForestClassifier
+
+rf = RandomForestClassifier(
+    n_estimators=300,
+    max_depth=5,
+    min_samples_leaf=10,
+    class_weight="balanced_subsample",
+    random_state=42
 )
 
-# --- 11.4: Model: scale -> logistic regression ---
+rf.fit(X_train, y_train)
 
-logreg_clf = Pipeline([
-    ("scaler", StandardScaler()),
-    ("logreg", LogisticRegression(
-        max_iter=1000,
-        class_weight="balanced",   # helpful if UP vs DOWN is imbalanced
-        solver="lbfgs"
-    ))
-])
+y_pred_rf  = rf.predict(X_test)
+y_proba_rf = rf.predict_proba(X_test)[:, 1]
 
-logreg_clf.fit(X_train, y_train)
+acc_rf  = accuracy_score(y_test, y_pred_rf)
+prec_rf = precision_score(y_test, y_pred_rf)
+rec_rf  = recall_score(y_test, y_pred_rf)
+f1_rf   = f1_score(y_test, y_pred_rf)
+auc_rf  = roc_auc_score(y_test, y_proba_rf)
 
-y_pred = logreg_clf.predict(X_test)
-y_proba = logreg_clf.predict_proba(X_test)[:, 1]  # prob of UP
-
-# --- 11.5: Metrics ---
-
-acc  = accuracy_score(y_test, y_pred)
-prec = precision_score(y_test, y_pred, zero_division=0)
-rec  = recall_score(y_test, y_pred, zero_division=0)
-f1   = f1_score(y_test, y_pred, zero_division=0)
-auc  = roc_auc_score(y_test, y_proba)
-
-print(f"=== Binary Direction (H={H}d, UP=1 / DOWN=0) — Logistic Regression ===")
-print(f"Samples train/test: {len(y_train)}/{len(y_test)}")
-print(f"Accuracy : {acc:.3f}")
-print(f"Precision: {prec:.3f}")
-print(f"Recall   : {rec:.3f}")
-print(f"F1 score : {f1:.3f}")
-print(f"ROC AUC  : {auc:.3f}")
+print("=== Binary Direction (H=1d) — Random Forest ===")
+print(f"Accuracy : {acc_rf:.3f}")
+print(f"Precision: {prec_rf:.3f}")
+print(f"Recall   : {rec_rf:.3f}")
+print(f"F1 score : {f1_rf:.3f}")
+print(f"ROC AUC  : {auc_rf:.3f}")
 print("\nConfusion matrix (rows=true, cols=pred):")
-print(confusion_matrix(y_test, y_pred))
+print(confusion_matrix(y_test, y_pred_rf))
 print("\nClassification report:")
-print(classification_report(y_test, y_pred, digits=3))
+print(classification_report(y_test, y_pred_rf, digits=3))
 
-
-# In[63]:
-
-
-# ================================
-# 12) Helper to run binary logreg for any horizon
-# ================================
-from sklearn.model_selection import train_test_split
-
-def run_logreg_direction(feat, H=1, feature_cols=None, test_size=0.2):
-    """
-    Train and evaluate a binary UP/DOWN model for horizon H (trading days).
-    Returns:
-        metrics: dict
-        df_out: DataFrame with index=dates of test set and cols=[y_true, y_pred, proba_up]
-        model: fitted Pipeline
-    """
-    target_col = f"label_dir_{H}d"
-    if target_col not in feat.columns:
-        raise ValueError(f"{target_col} not in feat.columns")
-
-    # drop neutral
-    df_bin = feat.loc[feat[target_col] != 0].copy()
-    y = (df_bin[target_col] == 1).astype(int)
-
-    if feature_cols is None:
-        feature_cols = [
-            "ret_1d", "ret_5d", "ret_10d",
-            "vol_10d", "vol_20d",
-            "sent_net_mean", "sent_net_sum",
-            "sent_pos_mean", "sent_neg_mean",
-            "n_articles",
-        ]
-
-    missing_feats = [c for c in feature_cols if c not in df_bin.columns]
-    if missing_feats:
-        raise ValueError(f"Missing feature columns: {missing_feats}")
-
-    X = df_bin[feature_cols].copy()
-
-    # clean NaNs
-    mask_valid = X.notna().all(axis=1) & y.notna()
-    X = X.loc[mask_valid]
-    y = y.loc[mask_valid]
-
-    # keep the date index for later joining
-    dates = X.index
-
-    X_train, X_test, y_train, y_test, dates_train, dates_test = train_test_split(
-        X, y, dates,
-        test_size=test_size,
-        shuffle=False
-    )
-
-    logreg_clf = Pipeline([
-        ("scaler", StandardScaler()),
-        ("logreg", LogisticRegression(
-            max_iter=1000,
-            class_weight="balanced",
-            solver="lbfgs"
-        ))
-    ])
-
-    logreg_clf.fit(X_train, y_train)
-
-    y_pred  = logreg_clf.predict(X_test)
-    y_proba = logreg_clf.predict_proba(X_test)[:, 1]
-
-    acc  = accuracy_score(y_test, y_pred)
-    prec = precision_score(y_test, y_pred, zero_division=0)
-    rec  = recall_score(y_test, y_pred, zero_division=0)
-    f1   = f1_score(y_test, y_pred, zero_division=0)
-    auc  = roc_auc_score(y_test, y_proba)
-
-    metrics = {
-        "H": H,
-        "n_train": len(y_train),
-        "n_test": len(y_test),
-        "accuracy": acc,
-        "precision": prec,
-        "recall": rec,
-        "f1": f1,
-        "auc": auc,
-    }
-
-    df_out = pd.DataFrame({
-        "y_true": y_test.values,
-        "y_pred": y_pred,
-        "proba_up": y_proba,
-    }, index=dates_test)
-
-    print(f"=== Logistic Reg, H={H}d (UP=1/DOWN=0) ===")
-    print(f"Train/Test size: {len(y_train)}/{len(y_test)}")
-    print(f"Accuracy : {acc:.3f}")
-    print(f"Precision: {prec:.3f}")
-    print(f"Recall   : {rec:.3f}")
-    print(f"F1       : {f1:.3f}")
-    print(f"ROC AUC  : {auc:.3f}")
-    print("\nConfusion matrix:")
-    print(confusion_matrix(y_test, y_pred))
-    print("\nClassification report:")
-    print(classification_report(y_test, y_pred, digits=3))
-
-    return metrics, df_out, logreg_clf
-
-
-# # Evaluation
-
-# In[64]:
-
-
-metrics_1d, df_pred_1d, model_1d = run_logreg_direction(feat, H=1)
-
-
-# In[56]:
-
-
-# ================================
-# 13) Compare horizons
-# ================================
-all_metrics = []
-pred_store = {}
-
-for H in [1, 3, 5, 10]:
-    try:
-        m, df_p, _ = run_logreg_direction(feat, H=H)
-        all_metrics.append(m)
-        pred_store[H] = df_p
-    except Exception as e:
-        print(f"H={H} failed: {e}")
-
-df_horizon_metrics = pd.DataFrame(all_metrics)
-df_horizon_metrics
-
-
-# In[44]:
-
-
-# ================================
-# 14) Coefficients / feature importance
-# ================================
-H_best = 1  # or whichever you liked
-_, _, model_best = run_logreg_direction(feat, H=H_best)
-
-log_reg = model_best.named_steps["logreg"]
-coef = log_reg.coef_[0]  # 1D array
-feat_names = model_best.named_steps["scaler"].feature_names_in_
-
-coef_df = pd.DataFrame({
-    "feature": feat_names,
-    "coef": coef
-}).sort_values("coef", ascending=False)
-
-print(coef_df)
-
-
-# # Arima
