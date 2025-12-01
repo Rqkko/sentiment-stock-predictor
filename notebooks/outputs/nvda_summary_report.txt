@@ -1,75 +1,76 @@
 === NVDA Stock Sentiment Impact Summary ===
 
 Overall, the strongest correlation between news sentiment and stock price change is at a lag of 30 trading days.
-Correlation coefficient at this lag: -0.011
+Correlation coefficient at this lag: -0.021
 
-Number of articles with valid impact data: 9211
+Reloading df_results from ./outputs/nvda_news_lagged_results_with_bestlag.csv to get best-lag columns.
+Number of articles with valid impact data: 8779
 
 Showing 5 example news impacts:
 
+- Lag days: 43 days, 0:00:00
+  News Date: 2025-04-30
+  Impact Date (30 trading days later): 2025-06-12
+  Headline: Franklin Global Equity Fund Q1 2025 Commentary
+  Price Change: 33.13%
+
+- Lag days: 9 days, 0:00:00
+  News Date: 2024-10-21
+  Impact Date (7 trading days later): 2024-10-30
+  Headline: Nvidia: After Understanding This, My Only Regret Is That I Didn't Buy More
+  Price Change: -3.04%
+
+- Lag days: 21 days, 0:00:00
+  News Date: 2025-02-10
+  Impact Date (14 trading days later): 2025-03-03
+  Headline: 3 Reasons It’s Time to Sell Some Magnificent 7 Stock
+  Price Change: -14.61%
+
 - Lag days: 44 days, 0:00:00
-  News Date: 2025-05-14
-  Impact Date (30 trading days later): 2025-06-27
-  Headline: NVIDIA Corporation (NVDA) Climbs on Price Target Increase, Upbeat News From Washington
-  Price Change: 16.57%
+  News Date: 2025-04-15
+  Impact Date (30 trading days later): 2025-05-29
+  Headline: Large cryptocurrencies mixed as Avalanche drops
+  Price Change: 24.06%
 
-- Lag days: 11 days, 0:00:00
-  News Date: 2024-12-05
-  Impact Date (7 trading days later): 2024-12-16
-  Headline: Intel: The Worst Is Not Over Yet
-  Price Change: -9.00%
-
-- Lag days: 48 days, 0:00:00
-  News Date: 2024-12-12
-  Impact Date (30 trading days later): 2025-01-29
-  Headline: Broadcom Stock Jumps on Surging AI Chip Sales. CEO Sees ‘Massive’ Opportunity.
-  Price Change: -9.93%
-
-- Lag days: 42 days, 0:00:00
-  News Date: 2025-07-17
-  Impact Date (30 trading days later): 2025-08-28
-  Headline: Jim Cramer Says Nvidia Getting Trump Approval For H20 Sales To China Is 'So Huge, Could Turn The Nasdaq Futures Around'
-  Price Change: 4.14%
-
-- Lag days: 11 days, 0:00:00
-  News Date: 2024-11-14
-  Impact Date (7 trading days later): 2024-11-25
-  Headline: Fidelity Magellan Fund Q3 2024 Review
-  Price Change: -7.32%
+- Lag days: 20 days, 0:00:00
+  News Date: 2025-03-14
+  Impact Date (14 trading days later): 2025-04-03
+  Headline: NVIDIA Corp., 3M share gains lead Dow's 475-point rally
+  Price Change: -16.33%
 
 
 === LSTM Model Summary ===
-Hyperparameters: {'hidden': 256, 'layers': 2, 'dropout': 0.3, 'lr': 0.0001, 'epochs': 50, 'batch': 32, 'weight_decay': 1e-05}
-Average Accuracy: 0.406
-Average Precision: 0.207
-Average Recall: 0.489
-Average F1 Score: 0.275
-Average MAE (timing prediction): 0.093
-Average MAPE (timing prediction): 336.39%
-Cumulative pseudo-return: -0.515
+Hyperparameters: {'hidden': 64, 'layers': 1, 'dropout': 0.1, 'lr': 0.001, 'epochs': 30, 'batch': 64, 'weight_decay': 0.0001}
+Average Accuracy: 0.357
+Average Precision: 0.241
+Average Recall: 0.433
+Average F1 Score: 0.273
+Average MAE (timing prediction): 0.066
+Average MAPE (timing prediction): 178.29%
+Cumulative pseudo-return: -0.952
 Aggregated Confusion Matrix (rows=true, cols=pred):
-[[ 95   0 112]
+[[ 92   0  32]
  [  0   0   0]
- [212   0 148]]
+ [168   0  33]]
 
 
 === Transformer Model Summary ===
-Hyperparameters: {'d_model': 128, 'nhead': 8, 'num_layers': 4, 'dropout': 0.3, 'lr': 0.0001, 'epochs': 50, 'batch': 32, 'weight_decay': 1e-05}
+Hyperparameters: {'d_model': 64, 'nhead': 4, 'num_layers': 2, 'dropout': 0.1, 'lr': 0.001, 'epochs': 30, 'batch': 64, 'weight_decay': 0.0001}
 Average Accuracy: 0.403
-Average Precision: 0.253
-Average Recall: 0.493
-Average F1 Score: 0.305
-Average MAE (timing prediction): 0.064
-Average MAPE (timing prediction): 161.15%
-Cumulative pseudo-return: -0.598
+Average Precision: 0.301
+Average Recall: 0.504
+Average F1 Score: 0.334
+Average MAE (timing prediction): 0.065
+Average MAPE (timing prediction): 147.79%
+Cumulative pseudo-return: -0.681
 Aggregated Confusion Matrix (rows=true, cols=pred):
-[[121   0  86]
+[[ 70   0  54]
  [  0   0   0]
- [240   0 120]]
+ [139   0  62]]
 
 === Hybrid Timing Model Summary ===
-Best regularization C: 0.1
-Average F1 score: 0.609
+Best regularization C: 3.0
+Average F1 score: 0.576
 
 Note: Price change is calculated as the percentage change in closing price relative to the closing price on or just after the news publication date.
 The impact delay (lag) indicates how many trading days after news publication the stock price shows the strongest per-article reaction.
