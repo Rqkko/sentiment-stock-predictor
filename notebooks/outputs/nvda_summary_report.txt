@@ -1,79 +1,39 @@
 === NVDA Stock Sentiment Impact Summary ===
 
-Overall, the strongest correlation between news sentiment and stock price change is at a lag of 30 trading days.
+Overall, the strongest correlation between news sentiment and stock price change is at a lag of 14 trading days.
 Correlation coefficient at this lag: -0.021
 
-Reloading df_results from ./outputs/nvda_news_lagged_results_with_bestlag.csv to get best-lag columns.
 Number of articles with valid impact data: 8779
 
 Showing 5 example news impacts:
 
-- Lag days: 43 days, 0:00:00
-  News Date: 2025-04-30
-  Impact Date (30 trading days later): 2025-06-12
-  Headline: Franklin Global Equity Fund Q1 2025 Commentary
-  Price Change: 33.13%
-
-- Lag days: 9 days, 0:00:00
-  News Date: 2024-10-21
-  Impact Date (7 trading days later): 2024-10-30
-  Headline: Nvidia: After Understanding This, My Only Regret Is That I Didn't Buy More
-  Price Change: -3.04%
+- Lag days: 5 days, 0:00:00
+  News Date: 2025-05-09
+  Impact Date (3 trading days later): 2025-05-14
+  Headline: Exclusive-Nvidia modifies H20 chip for China to overcome US export controls, sources say
+  Price Change: 16.02%
 
 - Lag days: 21 days, 0:00:00
-  News Date: 2025-02-10
-  Impact Date (14 trading days later): 2025-03-03
-  Headline: 3 Reasons It’s Time to Sell Some Magnificent 7 Stock
-  Price Change: -14.61%
+  News Date: 2024-11-11
+  Impact Date (14 trading days later): 2024-12-02
+  Headline: Nvidia Rises as Piper Sandler Labels It Top Large-Cap AI Pick
+  Price Change: -4.56%
 
-- Lag days: 44 days, 0:00:00
-  News Date: 2025-04-15
-  Impact Date (30 trading days later): 2025-05-29
-  Headline: Large cryptocurrencies mixed as Avalanche drops
-  Price Change: 24.06%
+- Lag days: 21 days, 0:00:00
+  News Date: 2025-05-26
+  Impact Date (14 trading days later): 2025-06-16
+  Headline: Nvidia to launch cheaper Blackwell AI chip for China after US export curbs, sources say
+  Price Change: 6.79%
 
 - Lag days: 20 days, 0:00:00
-  News Date: 2025-03-14
-  Impact Date (14 trading days later): 2025-04-03
-  Headline: NVIDIA Corp., 3M share gains lead Dow's 475-point rally
-  Price Change: -16.33%
+  News Date: 2025-07-30
+  Impact Date (14 trading days later): 2025-08-19
+  Headline: Qualcomm (NASDAQ:QCOM) Reports Q2 In Line With Expectations But Stock Drops
+  Price Change: -2.02%
 
+- Lag days: 21 days, 0:00:00
+  News Date: 2025-07-04
+  Impact Date (14 trading days later): 2025-07-25
+  Headline: Markets' 90-day tariff pause rollercoaster nears an uncertain end
+  Price Change: 9.64%
 
-=== LSTM Model Summary ===
-Hyperparameters: {'hidden': 64, 'layers': 1, 'dropout': 0.1, 'lr': 0.001, 'epochs': 30, 'batch': 64, 'weight_decay': 0.0001}
-Average Accuracy: 0.357
-Average Precision: 0.241
-Average Recall: 0.433
-Average F1 Score: 0.273
-Average MAE (timing prediction): 0.066
-Average MAPE (timing prediction): 178.29%
-Cumulative pseudo-return: -0.952
-Aggregated Confusion Matrix (rows=true, cols=pred):
-[[ 92   0  32]
- [  0   0   0]
- [168   0  33]]
-
-
-=== Transformer Model Summary ===
-Hyperparameters: {'d_model': 64, 'nhead': 4, 'num_layers': 2, 'dropout': 0.1, 'lr': 0.001, 'epochs': 30, 'batch': 64, 'weight_decay': 0.0001}
-Average Accuracy: 0.403
-Average Precision: 0.301
-Average Recall: 0.504
-Average F1 Score: 0.334
-Average MAE (timing prediction): 0.065
-Average MAPE (timing prediction): 147.79%
-Cumulative pseudo-return: -0.681
-Aggregated Confusion Matrix (rows=true, cols=pred):
-[[ 70   0  54]
- [  0   0   0]
- [139   0  62]]
-
-=== Hybrid Timing Model Summary ===
-Best regularization C: 3.0
-Average F1 score: 0.576
-
-Note: Price change is calculated as the percentage change in closing price relative to the closing price on or just after the news publication date.
-The impact delay (lag) indicates how many trading days after news publication the stock price shows the strongest per-article reaction.
-ML model metrics summarize predictive performance on classification of price direction and timing of movements (MAE for continuous return prediction).
-
-Detailed impact summary saved to: ./outputs/nvda_summary_report.txt
