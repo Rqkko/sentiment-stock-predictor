@@ -397,7 +397,7 @@ print(f"Saved per-article lagged results -> {out_path}, Processed articles: {len
 
 # # Analysis
 
-# In[91]:
+# In[124]:
 
 
 # ================================
@@ -480,7 +480,7 @@ else:
     print("No valid lag results to save.")
 
 
-# In[92]:
+# In[125]:
 
 
 # -------------------------
@@ -502,7 +502,7 @@ df_results.to_csv(os.path.join(OUT_DIR, "nvda_news_lagged_results_with_bestlag.c
 print("Saved per-article best-lag file.")
 
 
-# In[93]:
+# In[126]:
 
 
 # -------------------------
@@ -530,7 +530,7 @@ print("Plots saved in", OUT_DIR)
 print("Done.")
 
 
-# In[94]:
+# In[127]:
 
 
 # --------- load prerequisites from disk (so we don't need steps 1–3) ---------
@@ -538,7 +538,7 @@ df_results = pd.read_csv(os.path.join(OUT_DIR, "nvda_news_lagged_results.csv"))
 df_price   = pd.read_csv(os.path.join(OUT_DIR, "price_data.csv"))
 
 
-# In[95]:
+# In[ ]:
 
 
 # ================================
@@ -618,8 +618,10 @@ for c in ["sent_net_mean", "sent_net_sum", "sent_pos_mean", "sent_neg_mean", "n_
     if c in feat.columns:
         feat[c] = feat[c].fillna(0)
 
-# --- future label horizons ---
-HORIZONS = [1, 3, 5, 10]  # trading days ahead
+
+# ================================
+# 🔹 NEW STEP 2: extra predictive features
+# ================================
 
 # auto-detect close column (handles "close" or "close_NVDA" cases)
 close_candidates = [c for c in feat.columns if c.startswith("close")]
@@ -627,6 +629,22 @@ if len(close_candidates) == 0:
     raise ValueError(f"No 'close*' column found in feat.columns: {feat.columns.tolist()}")
 close_col = close_candidates[0]
 print(f"Using close column: {close_col}")
+
+# 1) Price momentum features
+feat["mom_3d"]  = feat[close_col].pct_change(3)
+feat["mom_7d"]  = feat[close_col].pct_change(7)
+feat["mom_14d"] = feat[close_col].pct_change(14)
+
+# 2) Volatility regime (ratio of long vs short vol)
+feat["vol_regime"] = feat["vol_20d"] / feat["vol_10d"]
+
+# 3) Sentiment momentum (rolling averages of daily sentiment)
+feat["sent_mom_3d"] = feat["sent_net_mean"].rolling(3, min_periods=1).mean()
+feat["sent_mom_7d"] = feat["sent_net_mean"].rolling(7, min_periods=1).mean()
+
+
+# --- future label horizons ---
+HORIZONS = [1, 3, 5, 10]  # trading days ahead
 
 for h in HORIZONS:
     # return over next h days
@@ -639,13 +657,14 @@ for h in HORIZONS:
     )
     feat[f"label_dir_{h}d"] = lab
 
+# Drop rows with NaNs in any of the features / labels
 feat = feat.dropna().copy()
 
 print("Feature panel 'feat' ready. Shape:", feat.shape)
 print("Columns:", feat.columns.tolist())
 
 
-# In[96]:
+# In[ ]:
 
 
 # ================================
@@ -653,15 +672,15 @@ print("Columns:", feat.columns.tolist())
 # ================================
 
 # 1-day ahead binary label: 1 if next-day return > 0, else 0
-feat["y_bin_1d"] = (feat["label_ret_1d"] > 0).astype(int)
+feat["y_bin"] = (feat["label_ret_1d"] > 0).astype(int)
 
-print("Binary 1-day label created: y_bin_1d")
-print(feat["y_bin_1d"].value_counts())
+print("Binary 1-day label created: y_bin")
+print(feat["y_bin"].value_counts())
 print("\nClass distribution (%):")
-print(feat["y_bin_1d"].value_counts(normalize=True).round(3))
+print(feat["y_bin"].value_counts(normalize=True).round(3))
 
 
-# In[97]:
+# In[ ]:
 
 
 # ================================
@@ -670,51 +689,58 @@ print(feat["y_bin_1d"].value_counts(normalize=True).round(3))
 
 # Choose features: price history + volatility + sentiment + news intensity
 feature_cols = [
-    "ret_1d",
-    "ret_5d",
-    "ret_10d",
-    "vol_10d",
-    "vol_20d",
-    "sent_net_mean",
-    "sent_net_sum",
-    "sent_pos_mean",
-    "sent_neg_mean",
+    "ret_1d", "ret_5d", "ret_10d",
+    "vol_10d", "vol_20d",
+    "mom_3d", "mom_7d", "mom_14d",
+    "vol_regime",
+    "sent_net_mean", "sent_net_sum",
+    "sent_pos_mean", "sent_neg_mean",
+    "sent_mom_3d", "sent_mom_7d",
     "n_articles",
 ]
 
-# Ensure all required columns exist
-missing = [c for c in feature_cols if c not in bin_df.columns]
+# Ensure all required columns exist in feat
+missing = [c for c in feature_cols if c not in feat.columns]
 if missing:
-    raise ValueError(f"Missing feature columns in bin_df: {missing}")
+    raise ValueError(f"Missing feature columns in feat: {missing}")
 
 # Drop rows with NaNs in features or target
-bin_df_model = bin_df.dropna(subset=feature_cols + ["y_bin"]).copy()
+model_df = feat.dropna(subset=feature_cols + ["y_bin"]).copy()
 
-print("Final modeling dataset shape:", bin_df_model.shape)
+print("Final modeling dataset shape:", model_df.shape)
 
-# Design X and y
-X = bin_df_model[feature_cols].values
-y = bin_df_model["y_bin"].values
+# Design X and y (keep X as DataFrame so index = dates)
+X = model_df[feature_cols]
+y = model_df["y_bin"]
 
 # Simple time-based split: first 80% train, last 20% test
-n = len(bin_df_model)
+n = len(model_df)
 split_idx = int(n * 0.8)
 
-X_train, X_test = X[:split_idx], X[split_idx:]
-y_train, y_test = y[:split_idx], y[split_idx:]
+X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
+y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
 
 print(f"Train size: {len(y_train)}, Test size: {len(y_test)}")
-print("Train class distribution:", pd.Series(y_train).value_counts().to_dict())
-print("Test class distribution:", pd.Series(y_test).value_counts().to_dict())
+print("Train class distribution:", y_train.value_counts().to_dict())
+print("Test class distribution:", y_test.value_counts().to_dict())
 
 
-# In[98]:
+# In[136]:
 
 
 # ================================
 # 12) Binary Direction (H=1d) — Random Forest baseline
 # ================================
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    confusion_matrix,
+    classification_report
+)
 
 rf = RandomForestClassifier(
     n_estimators=300,
@@ -727,7 +753,7 @@ rf = RandomForestClassifier(
 rf.fit(X_train, y_train)
 
 y_pred_rf  = rf.predict(X_test)
-y_proba_rf = rf.predict_proba(X_test)[:, 1]
+y_proba_rf = rf.predict_proba(X_test)[:, 1]   # <-- will use this for threshold tuning
 
 acc_rf  = accuracy_score(y_test, y_pred_rf)
 prec_rf = precision_score(y_test, y_pred_rf)
@@ -735,7 +761,7 @@ rec_rf  = recall_score(y_test, y_pred_rf)
 f1_rf   = f1_score(y_test, y_pred_rf)
 auc_rf  = roc_auc_score(y_test, y_proba_rf)
 
-print("=== Binary Direction (H=1d) — Random Forest ===")
+print("=== Binary Direction (H=1d) — Random Forest (default threshold=0.5) ===")
 print(f"Accuracy : {acc_rf:.3f}")
 print(f"Precision: {prec_rf:.3f}")
 print(f"Recall   : {rec_rf:.3f}")
@@ -745,4 +771,113 @@ print("\nConfusion matrix (rows=true, cols=pred):")
 print(confusion_matrix(y_test, y_pred_rf))
 print("\nClassification report:")
 print(classification_report(y_test, y_pred_rf, digits=3))
+
+
+# ==========================================
+# 12b) STEP 3 — tune decision threshold
+# ==========================================
+
+thresholds = [0.3, 0.4, 0.5, 0.6, 0.7]
+
+print("\n=== Threshold sweep (positive=UP trade) ===")
+best_thr = None
+best_f1  = -1
+
+for thr in thresholds:
+    y_pred_thr = (y_proba_rf >= thr).astype(int)
+
+    acc  = accuracy_score(y_test, y_pred_thr)
+    prec = precision_score(y_test, y_pred_thr, zero_division=0)
+    rec  = recall_score(y_test, y_pred_thr, zero_division=0)
+    f1   = f1_score(y_test, y_pred_thr, zero_division=0)
+
+    print(f"thr={thr:.2f}  |  acc={acc:.3f}  prec={prec:.3f}  rec={rec:.3f}  f1={f1:.3f}")
+
+    if f1 > best_f1:
+        best_f1  = f1
+        best_thr = thr
+
+print(f"\nBest threshold by F1: {best_thr:.2f} (F1={best_f1:.3f})")
+
+# Optional: inspect confusion matrix at best_thr
+y_pred_best = (y_proba_rf >= best_thr).astype(int)
+print("\nConfusion matrix at best_thr (rows=true, cols=pred):")
+print(confusion_matrix(y_test, y_pred_best))
+
+
+# In[137]:
+
+
+# ================================
+# 12c) STEP 4 — Long / Short / Flat 1-day Strategy (H=1d)
+# ================================
+import numpy as np
+import pandas as pd
+
+# 1) Get the test dates from X_test (we kept the index in cell 10)
+test_idx = X_test.index
+
+# 2) Realized next-day returns for those test dates
+#    This was created in feature-engineering: label_ret_1d
+realized_ret_1d = feat.loc[test_idx, "label_ret_1d"]
+
+# 3) Convert RF probabilities to a Series indexed by test dates
+proba_up = pd.Series(y_proba_rf, index=test_idx)
+
+# 4) Define upper and lower thresholds for "confident" signals
+#    You can tweak these, but this is a reasonable starting point:
+upper = 0.60   # only go LONG if P(UP) >= 60%
+lower = 0.40   # only go SHORT if P(UP) <= 40%
+
+# 5) Build trading signal:
+#    +1 = long, -1 = short, 0 = flat
+signal = pd.Series(0, index=test_idx)
+signal[proba_up >= upper] = 1
+signal[proba_up <= lower] = -1
+
+# 6) Strategy daily returns: position * next-day return
+strategy_ret = signal * realized_ret_1d
+
+# --- Basic stats ---
+n_days    = len(test_idx)
+n_long    = (signal == 1).sum()
+n_short   = (signal == -1).sum()
+n_flat    = (signal == 0).sum()
+
+long_ret  = strategy_ret[signal == 1]
+short_ret = strategy_ret[signal == -1]
+
+avg_long_ret  = long_ret.mean() if len(long_ret) > 0 else np.nan
+avg_short_ret = short_ret.mean() if len(short_ret) > 0 else np.nan
+
+win_rate_long  = (long_ret > 0).mean() if len(long_ret) > 0 else np.nan
+win_rate_short = (short_ret > 0).mean() if len(short_ret) > 0 else np.nan  # "win" = profit on short
+
+# Total cumulative returns
+cum_strategy = (1 + strategy_ret).prod() - 1
+cum_buyhold  = (1 + realized_ret_1d).prod() - 1  # always long benchmark
+
+print("=== 1-day Long/Short/Flat Strategy (test set) ===")
+print(f"Horizon: 1 trading day")
+print(f"Upper threshold (long): {upper:.2f}")
+print(f"Lower threshold (short): {lower:.2f}")
+print(f"Number of test days: {n_days}")
+print(f"Days long : {n_long}")
+print(f"Days short: {n_short}")
+print(f"Days flat : {n_flat}\n")
+
+if n_long > 0:
+    print(f"Avg return when LONG : {avg_long_ret*100:.3f}%")
+    print(f"Win rate when LONG  : {win_rate_long*100:.1f}%")
+else:
+    print("No LONG trades taken.")
+
+if n_short > 0:
+    print(f"\nAvg return when SHORT: {avg_short_ret*100:.3f}%")
+    print(f"Win rate when SHORT : {win_rate_short*100:.1f}%")
+else:
+    print("\nNo SHORT trades taken.")
+
+print(f"\nCumulative strategy return (test period): {cum_strategy*100:.2f}%")
+print(f"Cumulative buy-and-hold over same period: {cum_buyhold*100:.2f}%")
 
