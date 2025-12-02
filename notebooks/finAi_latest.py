@@ -3,13 +3,7 @@
 
 # Finnhub: d4m5t5hr01qjidhtok10d4m5t5hr01qjidhtok1g
 
-# In[2]:
-
-
-get_ipython().system('pip install finnhub')
-
-
-# In[7]:
+# In[1]:
 
 
 import os, time, hashlib
@@ -20,12 +14,9 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from scipy.special import softmax
 from pandas.tseries.offsets import BDay
-from scipy import stats
-from sklearn.linear_model import LinearRegression
-import matplotlib.pyplot as plt
 
 
-# In[11]:
+# In[2]:
 
 
 # ------------------- CONFIG -------------------
@@ -36,7 +27,7 @@ SYMBOL = "NVDA"
 CUTOVER_DATE = datetime(2024, 8, 28).date()  # use Finnhub on or after
 YEAR_START = "2023-07-01"
 YEAR_END = "2025-08-01"
-LAG_DAYS = [1, 3, 7, 14]
+LAG_DAYS = [0, 1, 3, 7, 14]
 OUT_DIR = "./outputs"
 os.makedirs(OUT_DIR, exist_ok=True)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -49,7 +40,7 @@ MARKETAUX_URL = "https://api.marketaux.com/v1/news/all"
 # finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
 
-# # Building Data
+# # Data Loading and Preprocessing
 
 # In[ ]:
 
@@ -176,7 +167,15 @@ print("Price data saved.")
 # Next: compute lags, directional labels, correlation, etc. (unchanged)
 
 
-# In[6]:
+# In[ ]:
+
+
+from scipy import stats
+from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+
+
+# In[ ]:
 
 
 # -------------------------
@@ -282,7 +281,7 @@ df_results.to_csv(os.path.join(OUT_DIR, "nvda_news_lagged_results.csv"), index=F
 print(f"Saved per-article lagged results. Processed articles: {len(df_results)}")
 
 
-# In[29]:
+# In[ ]:
 
 
 # ================================
@@ -395,9 +394,65 @@ df_results.to_csv(out_path, index=False)
 print(f"Saved per-article lagged results -> {out_path}, Processed articles: {len(df_results)}")
 
 
-# # Analysis
+# In[ ]:
 
-# In[124]:
+
+# -------------------------
+# 5) Analysis: correlation, regression, directional accuracy
+# -------------------------
+print("Analyzing results by lag...")
+summary_rows = []
+
+for lag in LAG_DAYS:
+    col = f"pct_change_{lag}d"
+
+    if "sent_net" not in df_results.columns or col not in df_results.columns:
+        print(f"Skipping lag {lag}d — missing 'sent_net' or '{col}' in df_results.")
+        continue
+
+    tmp = df_results[["sent_net", col]].dropna()
+    n = len(tmp)
+
+    if n >= 5:
+        r_val, p_val = stats.pearsonr(tmp["sent_net"], tmp[col])
+        X = tmp[["sent_net"]].values.reshape(-1, 1)
+        y = tmp[col].values
+        lr = LinearRegression().fit(X, y)
+        coef = float(lr.coef_[0])
+        intercept = float(lr.intercept_)
+        r2 = float(lr.score(X, y))
+    else:
+        r_val = p_val = coef = intercept = r2 = np.nan
+
+    tmp_dir = tmp.assign(
+        sent_dir=np.sign(tmp["sent_net"]),
+        price_dir=np.sign(tmp[col])
+    )
+    tmp_dir = tmp_dir[tmp_dir["sent_dir"] != 0]
+    accuracy = (tmp_dir["sent_dir"] == tmp_dir["price_dir"]).mean() if len(tmp_dir) > 0 else np.nan
+
+    summary_rows.append({
+        "lag_days": lag,
+        "n": n,
+        "pearson_r": r_val,
+        "p_value": p_val,
+        "reg_coef": coef,
+        "reg_intercept": intercept,
+        "reg_r2": r2,
+        "directional_accuracy": accuracy
+    })
+
+df_summary = pd.DataFrame(summary_rows).sort_values("lag_days")
+if not df_summary.empty:
+    summary_csv = os.path.join(OUT_DIR, "nvda_lag_summary.csv")
+    df_summary.to_csv(summary_csv, index=False)
+    print("Saved lag summary ->", summary_csv)
+    print(df_summary)
+else:
+    print("No valid lag results to save.")
+
+
+# In[ ]:
 
 
 # ================================
@@ -480,7 +535,7 @@ else:
     print("No valid lag results to save.")
 
 
-# In[125]:
+# In[ ]:
 
 
 # -------------------------
@@ -502,7 +557,7 @@ df_results.to_csv(os.path.join(OUT_DIR, "nvda_news_lagged_results_with_bestlag.c
 print("Saved per-article best-lag file.")
 
 
-# In[126]:
+# In[ ]:
 
 
 # -------------------------
@@ -530,7 +585,9 @@ print("Plots saved in", OUT_DIR)
 print("Done.")
 
 
-# In[127]:
+# # Modeling
+
+# In[3]:
 
 
 # --------- load prerequisites from disk (so we don't need steps 1–3) ---------
@@ -538,7 +595,7 @@ df_results = pd.read_csv(os.path.join(OUT_DIR, "nvda_news_lagged_results.csv"))
 df_price   = pd.read_csv(os.path.join(OUT_DIR, "price_data.csv"))
 
 
-# In[ ]:
+# In[4]:
 
 
 # ================================
@@ -618,10 +675,8 @@ for c in ["sent_net_mean", "sent_net_sum", "sent_pos_mean", "sent_neg_mean", "n_
     if c in feat.columns:
         feat[c] = feat[c].fillna(0)
 
-
-# ================================
-# 🔹 NEW STEP 2: extra predictive features
-# ================================
+# --- future label horizons ---
+HORIZONS = [1, 3, 5, 10]  # trading days ahead
 
 # auto-detect close column (handles "close" or "close_NVDA" cases)
 close_candidates = [c for c in feat.columns if c.startswith("close")]
@@ -629,22 +684,6 @@ if len(close_candidates) == 0:
     raise ValueError(f"No 'close*' column found in feat.columns: {feat.columns.tolist()}")
 close_col = close_candidates[0]
 print(f"Using close column: {close_col}")
-
-# 1) Price momentum features
-feat["mom_3d"]  = feat[close_col].pct_change(3)
-feat["mom_7d"]  = feat[close_col].pct_change(7)
-feat["mom_14d"] = feat[close_col].pct_change(14)
-
-# 2) Volatility regime (ratio of long vs short vol)
-feat["vol_regime"] = feat["vol_20d"] / feat["vol_10d"]
-
-# 3) Sentiment momentum (rolling averages of daily sentiment)
-feat["sent_mom_3d"] = feat["sent_net_mean"].rolling(3, min_periods=1).mean()
-feat["sent_mom_7d"] = feat["sent_net_mean"].rolling(7, min_periods=1).mean()
-
-
-# --- future label horizons ---
-HORIZONS = [1, 3, 5, 10]  # trading days ahead
 
 for h in HORIZONS:
     # return over next h days
@@ -657,30 +696,43 @@ for h in HORIZONS:
     )
     feat[f"label_dir_{h}d"] = lab
 
-# Drop rows with NaNs in any of the features / labels
 feat = feat.dropna().copy()
 
 print("Feature panel 'feat' ready. Shape:", feat.shape)
 print("Columns:", feat.columns.tolist())
 
 
-# In[ ]:
+# In[5]:
 
 
 # ================================
-# 8b) Simple binary labels (no neutral band)
+# 9) Binary direction dataset for H = 1 day
 # ================================
 
-# 1-day ahead binary label: 1 if next-day return > 0, else 0
-feat["y_bin"] = (feat["label_ret_1d"] > 0).astype(int)
+H_BIN = 1   # <-- we focus on 1 trading day ahead
 
-print("Binary 1-day label created: y_bin")
-print(feat["y_bin"].value_counts())
-print("\nClass distribution (%):")
-print(feat["y_bin"].value_counts(normalize=True).round(3))
+label_col_3class = f"label_dir_{H_BIN}d"
+if label_col_3class not in feat.columns:
+    raise ValueError(f"{label_col_3class} not found in feat. Run feature-engineering first.")
+
+# Work on a copy
+bin_df = feat.copy()
+
+# Filter out neutral days (label_dir == 0)
+mask_non_neutral = bin_df[label_col_3class] != 0
+bin_df = bin_df.loc[mask_non_neutral].copy()
+
+print(f"[H={H_BIN}d] Total days before neutral filter: {len(feat)}")
+print(f"[H={H_BIN}d] Total days after removing neutral band: {len(bin_df)}")
+
+# Map -1 -> 0 (down), +1 -> 1 (up)
+bin_df["y_bin"] = bin_df[label_col_3class].map({-1: 0, 1: 1})
+
+print("Class distribution (0=down, 1=up):")
+print(bin_df["y_bin"].value_counts())
 
 
-# In[ ]:
+# In[6]:
 
 
 # ================================
@@ -689,58 +741,126 @@ print(feat["y_bin"].value_counts(normalize=True).round(3))
 
 # Choose features: price history + volatility + sentiment + news intensity
 feature_cols = [
-    "ret_1d", "ret_5d", "ret_10d",
-    "vol_10d", "vol_20d",
-    "mom_3d", "mom_7d", "mom_14d",
-    "vol_regime",
-    "sent_net_mean", "sent_net_sum",
-    "sent_pos_mean", "sent_neg_mean",
-    "sent_mom_3d", "sent_mom_7d",
+    "ret_1d",
+    "ret_5d",
+    "ret_10d",
+    "vol_10d",
+    "vol_20d",
+    "sent_net_mean",
+    "sent_net_sum",
+    "sent_pos_mean",
+    "sent_neg_mean",
     "n_articles",
 ]
 
-# Ensure all required columns exist in feat
-missing = [c for c in feature_cols if c not in feat.columns]
+# Ensure all required columns exist
+missing = [c for c in feature_cols if c not in bin_df.columns]
 if missing:
-    raise ValueError(f"Missing feature columns in feat: {missing}")
+    raise ValueError(f"Missing feature columns in bin_df: {missing}")
 
 # Drop rows with NaNs in features or target
-model_df = feat.dropna(subset=feature_cols + ["y_bin"]).copy()
+bin_df_model = bin_df.dropna(subset=feature_cols + ["y_bin"]).copy()
 
-print("Final modeling dataset shape:", model_df.shape)
+print("Final modeling dataset shape:", bin_df_model.shape)
 
-# Design X and y (keep X as DataFrame so index = dates)
-X = model_df[feature_cols]
-y = model_df["y_bin"]
+# Design X and y
+X = bin_df_model[feature_cols].values
+y = bin_df_model["y_bin"].values
 
 # Simple time-based split: first 80% train, last 20% test
-n = len(model_df)
+n = len(bin_df_model)
 split_idx = int(n * 0.8)
 
-X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
-y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+X_train, X_test = X[:split_idx], X[split_idx:]
+y_train, y_test = y[:split_idx], y[split_idx:]
 
 print(f"Train size: {len(y_train)}, Test size: {len(y_test)}")
-print("Train class distribution:", y_train.value_counts().to_dict())
-print("Test class distribution:", y_test.value_counts().to_dict())
+print("Train class distribution:", pd.Series(y_train).value_counts().to_dict())
+print("Test class distribution:", pd.Series(y_test).value_counts().to_dict())
 
 
-# In[136]:
+# In[7]:
+
+
+# ================================
+# 11) Binary Direction (H=1d) — Tuned Logistic Regression
+# ================================
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report,
+    roc_auc_score,
+)
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+
+# Pipeline: scale -> logistic regression
+pipe = Pipeline([
+    ("scaler", StandardScaler()),
+    ("logreg", LogisticRegression(
+        max_iter=2000,
+        class_weight="balanced",  # helps handle class imbalance
+        solver="lbfgs"
+    ))
+])
+
+# Hyperparameter grid for C (regularization strength)
+param_grid = {
+    "logreg__C": [0.01, 0.1, 1.0, 10.0, 100.0]
+}
+
+# TimeSeriesSplit to respect temporal ordering
+tscv = TimeSeriesSplit(n_splits=5)
+
+grid = GridSearchCV(
+    estimator=pipe,
+    param_grid=param_grid,
+    cv=tscv,
+    scoring="f1",     # optimize for F1 (balance precision/recall)
+    n_jobs=-1,
+    verbose=0
+)
+
+grid.fit(X_train, y_train)
+
+print("Best params from CV:", grid.best_params_)
+logreg_clf = grid.best_estimator_
+
+# Evaluate on test set (genuine out-of-sample)
+y_pred  = logreg_clf.predict(X_test)
+y_proba = logreg_clf.predict_proba(X_test)[:, 1]
+
+acc  = accuracy_score(y_test, y_pred)
+prec = precision_score(y_test, y_pred)
+rec  = recall_score(y_test, y_pred)
+f1   = f1_score(y_test, y_pred)
+auc  = roc_auc_score(y_test, y_proba)
+
+print("=== Binary Direction (H=1d, UP=1 / DOWN=0) — Tuned Logistic Regression ===")
+print(f"Samples train/test: {len(y_train)}/{len(y_test)}")
+print(f"Accuracy : {acc:.3f}")
+print(f"Precision: {prec:.3f}")
+print(f"Recall   : {rec:.3f}")
+print(f"F1 score : {f1:.3f}")
+print(f"ROC AUC  : {auc:.3f}")
+print("\nConfusion matrix (rows=true, cols=pred):")
+print(confusion_matrix(y_test, y_pred))
+print("\nClassification report:")
+print(classification_report(y_test, y_pred, digits=3))
+
+
+# In[8]:
 
 
 # ================================
 # 12) Binary Direction (H=1d) — Random Forest baseline
 # ================================
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    roc_auc_score,
-    confusion_matrix,
-    classification_report
-)
 
 rf = RandomForestClassifier(
     n_estimators=300,
@@ -753,7 +873,7 @@ rf = RandomForestClassifier(
 rf.fit(X_train, y_train)
 
 y_pred_rf  = rf.predict(X_test)
-y_proba_rf = rf.predict_proba(X_test)[:, 1]   # <-- will use this for threshold tuning
+y_proba_rf = rf.predict_proba(X_test)[:, 1]
 
 acc_rf  = accuracy_score(y_test, y_pred_rf)
 prec_rf = precision_score(y_test, y_pred_rf)
@@ -761,7 +881,7 @@ rec_rf  = recall_score(y_test, y_pred_rf)
 f1_rf   = f1_score(y_test, y_pred_rf)
 auc_rf  = roc_auc_score(y_test, y_proba_rf)
 
-print("=== Binary Direction (H=1d) — Random Forest (default threshold=0.5) ===")
+print("=== Binary Direction (H=1d) — Random Forest ===")
 print(f"Accuracy : {acc_rf:.3f}")
 print(f"Precision: {prec_rf:.3f}")
 print(f"Recall   : {rec_rf:.3f}")
@@ -773,111 +893,368 @@ print("\nClassification report:")
 print(classification_report(y_test, y_pred_rf, digits=3))
 
 
-# ==========================================
-# 12b) STEP 3 — tune decision threshold
-# ==========================================
+# # Evaluation
 
-thresholds = [0.3, 0.4, 0.5, 0.6, 0.7]
-
-print("\n=== Threshold sweep (positive=UP trade) ===")
-best_thr = None
-best_f1  = -1
-
-for thr in thresholds:
-    y_pred_thr = (y_proba_rf >= thr).astype(int)
-
-    acc  = accuracy_score(y_test, y_pred_thr)
-    prec = precision_score(y_test, y_pred_thr, zero_division=0)
-    rec  = recall_score(y_test, y_pred_thr, zero_division=0)
-    f1   = f1_score(y_test, y_pred_thr, zero_division=0)
-
-    print(f"thr={thr:.2f}  |  acc={acc:.3f}  prec={prec:.3f}  rec={rec:.3f}  f1={f1:.3f}")
-
-    if f1 > best_f1:
-        best_f1  = f1
-        best_thr = thr
-
-print(f"\nBest threshold by F1: {best_thr:.2f} (F1={best_f1:.3f})")
-
-# Optional: inspect confusion matrix at best_thr
-y_pred_best = (y_proba_rf >= best_thr).astype(int)
-print("\nConfusion matrix at best_thr (rows=true, cols=pred):")
-print(confusion_matrix(y_test, y_pred_best))
+# In[ ]:
 
 
-# In[137]:
+import random
+import pandas as pd
+import os
+
+summary_txt_path = os.path.join(OUT_DIR, "nvda_summary_report.txt")
+
+with open(summary_txt_path, "w", encoding="utf-8") as f:
+    def write_and_print(line=""):
+        print(line)
+        f.write(line + "\n")
+
+    write_and_print("=== NVDA Stock Sentiment Impact Summary ===\n")
+
+    # ---------------------------
+    # 1) Correlation / lag summary
+    # ---------------------------
+    if not df_summary.empty:
+        best_row = df_summary.loc[df_summary['pearson_r'].abs().idxmax()]
+        best_corr_lag = int(best_row["lag_days"])
+        best_corr_val = best_row["pearson_r"]
+
+        write_and_print(
+            f"Overall, the strongest correlation between news sentiment "
+            f"and stock price change is at a lag of {best_corr_lag} trading days."
+        )
+        write_and_print(f"Correlation coefficient at this lag: {best_corr_val:.3f}\n")
+    else:
+        write_and_print("No valid lag correlation results to summarize.\n")
+
+    # ---------------------------
+    # 2) Example article impacts
+    # ---------------------------
+    # Ensure best_lag_days / best_lag_pct_change exist
+    needed_cols = {"best_lag_days", "best_lag_pct_change"}
+    if not needed_cols.issubset(df_results.columns):
+        # try to reload from the enriched CSV if it exists
+        bestlag_path = os.path.join(OUT_DIR, "nvda_news_lagged_results_with_bestlag.csv")
+        if os.path.exists(bestlag_path):
+            write_and_print(f"Reloading df_results from {bestlag_path} to get best-lag columns.")
+            df_results = pd.read_csv(bestlag_path)
+        else:
+            write_and_print(
+                "Per-article best lag columns not found and "
+                "'nvda_news_lagged_results_with_bestlag.csv' is missing.\n"
+                "Skipping example article impacts section.\n"
+            )
+            valid_articles = pd.DataFrame()  # empty
+    # After reload attempt, check again
+    if needed_cols.issubset(df_results.columns):
+        valid_articles = df_results.dropna(subset=["best_lag_days", "best_lag_pct_change"])
+    else:
+        valid_articles = pd.DataFrame()
+
+    write_and_print(f"Number of articles with valid impact data: {len(valid_articles)}\n")
+
+    if len(valid_articles) == 0:
+        write_and_print("No articles with valid impact data to show examples.\n")
+    else:
+        sample_size = min(5, len(valid_articles))
+        examples = valid_articles.sample(sample_size, random_state=None)
+        write_and_print(f"Showing {sample_size} example news impacts:\n")
+
+        for _, row in examples.iterrows():
+            try:
+                best_lag_days = int(row["best_lag_days"])
+                trading_date_col = f"trading_date_{best_lag_days}d"
+                pct_change_col = f"pct_change_{best_lag_days}d"
+
+                pub_date = pd.to_datetime(row["pub_date"]).date()
+                impact_date = row.get(trading_date_col, None)
+                impact_pct = row.get(pct_change_col, None)
+
+                write_and_print(
+                    f"- Lag days: "
+                    f"{pd.to_datetime(impact_date).date() - pub_date if pd.notnull(impact_date) else 'N/A'}"
+                )
+                write_and_print(f"  News Date: {pub_date}")
+
+                if pd.notnull(impact_date):
+                    write_and_print(
+                        f"  Impact Date ({best_lag_days} trading days later): "
+                        f"{pd.to_datetime(impact_date).date()}"
+                    )
+                else:
+                    write_and_print(f"  Impact Date ({best_lag_days} trading days later): N/A")
+
+                write_and_print(f"  Headline: {row.get('headline', 'N/A')}")
+
+                if pd.notnull(impact_pct):
+                    write_and_print(f"  Price Change: {impact_pct*100:.2f}%\n")
+                else:
+                    write_and_print("  Price Change: N/A (no data)\n")
+            except Exception as e:
+                write_and_print(f"  Skipped an example due to error: {e}\n")
+
+    # ---------------------------
+    # 3) ML model results summary
+    # ---------------------------
+    def write_model_summary(name, result_dict, fold_metrics=None):
+        write_and_print(f"\n=== {name} Model Summary ===")
+        if result_dict is None:
+            write_and_print("No results available.\n")
+            return
+
+        write_and_print(f"Hyperparameters: {result_dict.get('params', {})}")
+        write_and_print(f"Average Accuracy: {result_dict.get('avg_acc', 0):.3f}")
+        write_and_print(f"Average Precision: {result_dict.get('avg_prec', 0):.3f}")
+        write_and_print(f"Average Recall: {result_dict.get('avg_rec', 0):.3f}")
+        write_and_print(f"Average F1 Score: {result_dict.get('avg_f1', 0):.3f}")
+        write_and_print(f"Average MAE (timing prediction): {result_dict.get('avg_mae', 0):.3f}")
+        write_and_print(f"Average MAPE (timing prediction): {result_dict.get('avg_mape', 0):.2f}%")
+        write_and_print(f"Cumulative pseudo-return: {result_dict.get('avg_cumret_sum', 0):.3f}")
+
+        # Include confusion matrix if fold_metrics provided
+        if fold_metrics:
+            total_cm = None
+            for m in fold_metrics:
+                cm = m.get("cm")
+                if cm is not None:
+                    if total_cm is None:
+                        total_cm = cm
+                    else:
+                        total_cm += cm
+            if total_cm is not None:
+                write_and_print("Aggregated Confusion Matrix (rows=true, cols=pred):")
+                write_and_print(str(total_cm))
+        write_and_print("")  # blank line
+
+    write_model_summary("LSTM", best_lstm, fold_metrics=lstm_fold_metrics)
+    write_model_summary("Transformer", best_trf, fold_metrics=trf_fold_metrics)
+
+    # Hybrid timing model
+    write_and_print("=== Hybrid Timing Model Summary ===")
+    if best_hybrid is not None:
+        write_and_print(f"Best regularization C: {best_hybrid.get('C')}")
+        write_and_print(f"Average F1 score: {best_hybrid.get('f1',0):.3f}\n")
+    else:
+        write_and_print("No hybrid timing model results available.\n")
+
+    # ---------------------------
+    # 4) Notes
+    # ---------------------------
+    write_and_print(
+        "Note: Price change is calculated as the percentage change in closing price "
+        "relative to the closing price on or just after the news publication date."
+    )
+    write_and_print(
+        "The impact delay (lag) indicates how many trading days after news publication "
+        "the stock price shows the strongest per-article reaction."
+    )
+    write_and_print(
+        "ML model metrics summarize predictive performance on classification of price direction "
+        "and timing of movements (MAE for continuous return prediction)."
+    )
+    write_and_print(f"\nDetailed impact summary saved to: {summary_txt_path}")
+
+
+# In[ ]:
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from pandas.plotting import table
+
+# --- Collect results dynamically ---
+models = []
+
+# LSTM
+if best_lstm is not None:
+    models.append({
+        "Model": "LSTM",
+        "Accuracy": best_lstm.get("avg_acc", 0),
+        "Precision": best_lstm.get("avg_prec", 0),
+        "Recall": best_lstm.get("avg_rec", 0),
+        "F1 Score": best_lstm.get("avg_f1", 0),
+        "MAE": best_lstm.get("avg_mae", 0),
+        "MAPE (%)": best_lstm.get("avg_mape", 0),
+        "Cumulative Return": best_lstm.get("avg_cumret_sum", 0)
+    })
+
+# Transformer
+if best_trf is not None:
+    models.append({
+        "Model": "Transformer",
+        "Accuracy": best_trf.get("avg_acc", 0),
+        "Precision": best_trf.get("avg_prec", 0),
+        "Recall": best_trf.get("avg_rec", 0),
+        "F1 Score": best_trf.get("avg_f1", 0),
+        "MAE": best_trf.get("avg_mae", 0),
+        "MAPE (%)": best_trf.get("avg_mape", 0),
+        "Cumulative Return": best_trf.get("avg_cumret_sum", 0)
+    })
+
+# Hybrid timing model (optional)
+if best_hybrid is not None:
+    models.append({
+        "Model": "Hybrid",
+        "Accuracy": None,
+        "Precision": None,
+        "Recall": None,
+        "F1 Score": best_hybrid.get("f1", 0),
+        "MAE": None,
+        "MAPE (%)": None,
+        "Cumulative Return": None
+    })
+
+# --- Convert to DataFrame ---
+df_models = pd.DataFrame(models).set_index("Model")
+
+# --- 1) Display graphical table ---
+fig, ax = plt.subplots(figsize=(10, 2))
+ax.axis("off")
+tbl = table(ax, df_models.round(3), loc="center", cellLoc="center")
+tbl.auto_set_font_size(False)
+tbl.set_fontsize(10)
+tbl.scale(1, 1.5)
+plt.title("Model Performance Table", fontsize=12)
+plt.show()
+
+# --- 2) Plot grouped bar chart ---
+metrics_to_plot = ["Accuracy", "Precision", "Recall", "F1 Score", "MAPE (%)", "Cumulative Return"]
+df_plot = df_models[metrics_to_plot]
+
+ax = df_plot.plot(kind="bar", figsize=(12, 6))
+plt.title("Model Performance Comparison")
+plt.ylabel("Score / % / Return")
+plt.xticks(rotation=0)
+plt.legend(title="Metrics")
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+plt.tight_layout()
+plt.show()
+
+
+# In[11]:
 
 
 # ================================
-# 12c) STEP 4 — Long / Short / Flat 1-day Strategy (H=1d)
+# Confusion matrix heatmap — Random Forest (H=1d, real model)
 # ================================
 import numpy as np
-import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
 
-# 1) Get the test dates from X_test (we kept the index in cell 10)
-test_idx = X_test.index
+# Use real test labels and RF predictions
+y_true_real = y_test
+y_pred_real = y_pred_rf
 
-# 2) Realized next-day returns for those test dates
-#    This was created in feature-engineering: label_ret_1d
-realized_ret_1d = feat.loc[test_idx, "label_ret_1d"]
+cm = confusion_matrix(y_true_real, y_pred_real)
 
-# 3) Convert RF probabilities to a Series indexed by test dates
-proba_up = pd.Series(y_proba_rf, index=test_idx)
+fig, ax = plt.subplots(figsize=(4, 4))
+im = ax.imshow(cm, cmap="Blues")
 
-# 4) Define upper and lower thresholds for "confident" signals
-#    You can tweak these, but this is a reasonable starting point:
-upper = 0.60   # only go LONG if P(UP) >= 60%
-lower = 0.40   # only go SHORT if P(UP) <= 40%
+# Add colorbar
+cbar = ax.figure.colorbar(im, ax=ax)
+cbar.ax.set_ylabel("Count", rotation=-90, va="bottom")
 
-# 5) Build trading signal:
-#    +1 = long, -1 = short, 0 = flat
-signal = pd.Series(0, index=test_idx)
-signal[proba_up >= upper] = 1
-signal[proba_up <= lower] = -1
+# Show numbers in each cell
+for i in range(cm.shape[0]):
+    for j in range(cm.shape[1]):
+        ax.text(
+            j,
+            i,
+            cm[i, j],
+            ha="center",
+            va="center",
+            color="black",
+            fontsize=10,
+        )
 
-# 6) Strategy daily returns: position * next-day return
-strategy_ret = signal * realized_ret_1d
+ax.set_xticks([0, 1])
+ax.set_yticks([0, 1])
+ax.set_xticklabels(["Pred 0 (Down)", "Pred 1 (Up)"], rotation=45, ha="right")
+ax.set_yticklabels(["True 0 (Down)", "True 1 (Up)"])
 
-# --- Basic stats ---
-n_days    = len(test_idx)
-n_long    = (signal == 1).sum()
-n_short   = (signal == -1).sum()
-n_flat    = (signal == 0).sum()
+ax.set_title("Random Forest (H=1d) — Confusion Matrix (Real Model)")
+ax.set_xlabel("Predicted label")
+ax.set_ylabel("True label")
 
-long_ret  = strategy_ret[signal == 1]
-short_ret = strategy_ret[signal == -1]
+plt.tight_layout()
+plt.show()
 
-avg_long_ret  = long_ret.mean() if len(long_ret) > 0 else np.nan
-avg_short_ret = short_ret.mean() if len(short_ret) > 0 else np.nan
 
-win_rate_long  = (long_ret > 0).mean() if len(long_ret) > 0 else np.nan
-win_rate_short = (short_ret > 0).mean() if len(short_ret) > 0 else np.nan  # "win" = profit on short
+# In[12]:
 
-# Total cumulative returns
-cum_strategy = (1 + strategy_ret).prod() - 1
-cum_buyhold  = (1 + realized_ret_1d).prod() - 1  # always long benchmark
 
-print("=== 1-day Long/Short/Flat Strategy (test set) ===")
-print(f"Horizon: 1 trading day")
-print(f"Upper threshold (long): {upper:.2f}")
-print(f"Lower threshold (short): {lower:.2f}")
-print(f"Number of test days: {n_days}")
-print(f"Days long : {n_long}")
-print(f"Days short: {n_short}")
-print(f"Days flat : {n_flat}\n")
+# ================================
+# RF vs Logistic — metric comparison (H=1d, real models)
+# ================================
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+)
 
-if n_long > 0:
-    print(f"Avg return when LONG : {avg_long_ret*100:.3f}%")
-    print(f"Win rate when LONG  : {win_rate_long*100:.1f}%")
-else:
-    print("No LONG trades taken.")
+models = ["LogReg", "RandomForest"]
 
-if n_short > 0:
-    print(f"\nAvg return when SHORT: {avg_short_ret*100:.3f}%")
-    print(f"Win rate when SHORT : {win_rate_short*100:.1f}%")
-else:
-    print("\nNo SHORT trades taken.")
+# Logistic Regression metrics (using current best logreg_clf)
+y_pred_log = logreg_clf.predict(X_test)
 
-print(f"\nCumulative strategy return (test period): {cum_strategy*100:.2f}%")
-print(f"Cumulative buy-and-hold over same period: {cum_buyhold*100:.2f}%")
+acc_log  = accuracy_score(y_test, y_pred_log)
+prec_log = precision_score(y_test, y_pred_log, zero_division=0)
+rec_log  = recall_score(y_test, y_pred_log, zero_division=0)
+f1_log   = f1_score(y_test, y_pred_log, zero_division=0)
+
+# Random Forest metrics (using current rf and y_pred_rf)
+acc_rf  = accuracy_score(y_test, y_pred_rf)
+prec_rf = precision_score(y_test, y_pred_rf, zero_division=0)
+rec_rf  = recall_score(y_test, y_pred_rf, zero_division=0)
+f1_rf   = f1_score(y_test, y_pred_rf, zero_division=0)
+
+acc_vals  = [acc_log,  acc_rf]
+prec_vals = [prec_log, prec_rf]
+rec_vals  = [rec_log,  rec_rf]
+f1_vals   = [f1_log,   f1_rf]
+
+x = np.arange(len(models))  # [0, 1]
+width = 0.2
+
+fig, ax = plt.subplots(figsize=(8, 5))
+
+ax.bar(x - 1.5*width, acc_vals,  width, label="Accuracy")
+ax.bar(x - 0.5*width, prec_vals, width, label="Precision")
+ax.bar(x + 0.5*width, rec_vals,  width, label="Recall")
+ax.bar(x + 1.5*width, f1_vals,   width, label="F1 score")
+
+ax.set_xticks(x)
+ax.set_xticklabels(models)
+ax.set_ylim(0, 1.0)
+
+ax.set_ylabel("Score")
+ax.set_title("H=1d — Logistic Regression vs Random Forest (Real Models)")
+ax.legend(loc="upper right")
+
+for i, vals in enumerate([acc_vals, prec_vals, rec_vals, f1_vals]):
+    for j, v in enumerate(vals):
+        ax.text(
+            j + (i - 1.5)*width,
+            v + 0.01,
+            f"{v:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+plt.tight_layout()
+plt.show()
+
+
+# In[ ]:
+
+
+up_mask = y_pred == 1
+hit_rate_up = (y_true[up_mask] == 1).mean()
+
+print(f"Hit rate when we predict UP: {hit_rate_up*100:.1f}%")
+print(f"Number of UP predictions: {up_mask.sum()} of {len(y_true)} total days")
 

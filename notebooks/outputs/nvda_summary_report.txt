@@ -1,39 +1,37 @@
 === NVDA Stock Sentiment Impact Summary ===
 
-Overall, the strongest correlation between news sentiment and stock price change is at a lag of 14 trading days.
-Correlation coefficient at this lag: -0.021
-
+Reloading df_results from ./outputs/nvda_news_lagged_results_with_bestlag.csv to get best-lag columns.
 Number of articles with valid impact data: 8779
 
 Showing 5 example news impacts:
 
-- Lag days: 5 days, 0:00:00
-  News Date: 2025-05-09
-  Impact Date (3 trading days later): 2025-05-14
-  Headline: Exclusive-Nvidia modifies H20 chip for China to overcome US export controls, sources say
-  Price Change: 16.02%
+- Lag days: 21 days, 0:00:00
+  News Date: 2024-11-12
+  Impact Date (14 trading days later): 2024-12-03
+  Headline: 3 Reasons Palantir Stock Is One of the Best Artificial Intelligence (AI) Stocks to Buy Now (Besides Great Revenue and Earnings Growth)
+  Price Change: -5.42%
 
 - Lag days: 21 days, 0:00:00
-  News Date: 2024-11-11
-  Impact Date (14 trading days later): 2024-12-02
-  Headline: Nvidia Rises as Piper Sandler Labels It Top Large-Cap AI Pick
-  Price Change: -4.56%
-
-- Lag days: 21 days, 0:00:00
-  News Date: 2025-05-26
-  Impact Date (14 trading days later): 2025-06-16
-  Headline: Nvidia to launch cheaper Blackwell AI chip for China after US export curbs, sources say
-  Price Change: 6.79%
+  News Date: 2025-06-26
+  Impact Date (14 trading days later): 2025-07-17
+  Headline: This Is The Peak Of The AI Bubble
+  Price Change: 11.60%
 
 - Lag days: 20 days, 0:00:00
-  News Date: 2025-07-30
-  Impact Date (14 trading days later): 2025-08-19
-  Headline: Qualcomm (NASDAQ:QCOM) Reports Q2 In Line With Expectations But Stock Drops
-  Price Change: -2.02%
+  News Date: 2024-09-28
+  Impact Date (14 trading days later): 2024-10-18
+  Headline: China Discourages Local Companies from Buying Nvidia (NASDAQ:NVDA) Chips
+  Price Change: 13.64%
+
+- Lag days: 20 days, 0:00:00
+  News Date: 2025-07-26
+  Impact Date (14 trading days later): 2025-08-15
+  Headline: Bloom Energy: Riding The AI Data Center Hype But Downgrading On Valuation - Sell
+  Price Change: 2.09%
 
 - Lag days: 21 days, 0:00:00
-  News Date: 2025-07-04
-  Impact Date (14 trading days later): 2025-07-25
-  Headline: Markets' 90-day tariff pause rollercoaster nears an uncertain end
-  Price Change: 9.64%
+  News Date: 2025-04-16
+  Impact Date (14 trading days later): 2025-05-07
+  Headline: Wall St tumbles, Nvidia drops after new US chip export curbs
+  Price Change: 12.03%
 
