@@ -16,7 +16,7 @@ from scipy.special import softmax
 from pandas.tseries.offsets import BDay
 
 
-# In[2]:
+# In[3]:
 
 
 # ------------------- CONFIG -------------------
@@ -587,7 +587,7 @@ print("Done.")
 
 # # Modeling
 
-# In[3]:
+# In[4]:
 
 
 # --------- load prerequisites from disk (so we don't need steps 1–3) ---------
@@ -595,7 +595,7 @@ df_results = pd.read_csv(os.path.join(OUT_DIR, "nvda_news_lagged_results.csv"))
 df_price   = pd.read_csv(os.path.join(OUT_DIR, "price_data.csv"))
 
 
-# In[4]:
+# In[5]:
 
 
 # ================================
@@ -702,7 +702,7 @@ print("Feature panel 'feat' ready. Shape:", feat.shape)
 print("Columns:", feat.columns.tolist())
 
 
-# In[5]:
+# In[6]:
 
 
 # ================================
@@ -732,14 +732,13 @@ print("Class distribution (0=down, 1=up):")
 print(bin_df["y_bin"].value_counts())
 
 
-# In[6]:
+# In[7]:
 
 
 # ================================
 # 10) Feature matrix X and target y (H = 1d)
 # ================================
 
-# Choose features: price history + volatility + sentiment + news intensity
 feature_cols = [
     "ret_1d",
     "ret_5d",
@@ -753,33 +752,32 @@ feature_cols = [
     "n_articles",
 ]
 
-# Ensure all required columns exist
 missing = [c for c in feature_cols if c not in bin_df.columns]
 if missing:
     raise ValueError(f"Missing feature columns in bin_df: {missing}")
 
-# Drop rows with NaNs in features or target
 bin_df_model = bin_df.dropna(subset=feature_cols + ["y_bin"]).copy()
 
 print("Final modeling dataset shape:", bin_df_model.shape)
 
-# Design X and y
-X = bin_df_model[feature_cols].values
-y = bin_df_model["y_bin"].values
+# Keep index for alignment later
+X = bin_df_model[feature_cols]
+y = bin_df_model["y_bin"]
+idx_all = bin_df_model.index
 
-# Simple time-based split: first 80% train, last 20% test
 n = len(bin_df_model)
 split_idx = int(n * 0.8)
 
-X_train, X_test = X[:split_idx], X[split_idx:]
-y_train, y_test = y[:split_idx], y[split_idx:]
+X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
+y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+idx_train, idx_test = idx_all[:split_idx], idx_all[split_idx:]
 
 print(f"Train size: {len(y_train)}, Test size: {len(y_test)}")
-print("Train class distribution:", pd.Series(y_train).value_counts().to_dict())
-print("Test class distribution:", pd.Series(y_test).value_counts().to_dict())
+print("Train class distribution:", y_train.value_counts().to_dict())
+print("Test class distribution:", y_test.value_counts().to_dict())
 
 
-# In[7]:
+# In[8]:
 
 
 # ================================
@@ -854,7 +852,7 @@ print("\nClassification report:")
 print(classification_report(y_test, y_pred, digits=3))
 
 
-# In[8]:
+# In[9]:
 
 
 # ================================
@@ -1131,7 +1129,7 @@ plt.tight_layout()
 plt.show()
 
 
-# In[11]:
+# In[10]:
 
 
 # ================================
@@ -1180,7 +1178,7 @@ plt.tight_layout()
 plt.show()
 
 
-# In[12]:
+# In[11]:
 
 
 # ================================
@@ -1249,12 +1247,92 @@ plt.tight_layout()
 plt.show()
 
 
-# In[ ]:
+# In[12]:
 
 
-up_mask = y_pred == 1
-hit_rate_up = (y_true[up_mask] == 1).mean()
+# ================================
+# Build visualization DataFrame linking predictions to price
+# ================================
 
-print(f"Hit rate when we predict UP: {hit_rate_up*100:.1f}%")
-print(f"Number of UP predictions: {up_mask.sum()} of {len(y_true)} total days")
+# detect close column used earlier
+close_candidates = [c for c in feat.columns if c.startswith("close")]
+if len(close_candidates) == 0:
+    raise ValueError("No 'close*' price column found in feat.")
+close_col = close_candidates[0]
+
+# restrict feat to the test index
+df_vis = pd.DataFrame(index=idx_test)
+df_vis["close"]    = feat.loc[idx_test, close_col]
+df_vis["true_dir"] = y_test.values          # 0=down, 1=up
+df_vis["pred_dir"] = y_pred                 # 0=down, 1=up
+df_vis["proba_up"] = y_proba                # predicted probability of UP
+
+print(df_vis.head())
+
+
+# In[13]:
+
+
+import matplotlib.pyplot as plt
+
+# ================================
+# Price chart with model predictions
+# ================================
+
+plt.figure(figsize=(12, 6))
+
+# 1) Price line
+plt.plot(df_vis.index, df_vis["close"], label="NVDA Close Price")
+
+# 2) Correct UP predictions (true=1, pred=1)
+mask_correct_up = (df_vis["true_dir"] == 1) & (df_vis["pred_dir"] == 1)
+plt.scatter(
+    df_vis.index[mask_correct_up],
+    df_vis["close"][mask_correct_up],
+    marker="^",
+    color="green",
+    s=60,
+    label="Correct UP"
+)
+
+# 3) Wrong UP predictions (true=0, pred=1)
+mask_wrong_up = (df_vis["true_dir"] == 0) & (df_vis["pred_dir"] == 1)
+plt.scatter(
+    df_vis.index[mask_wrong_up],
+    df_vis["close"][mask_wrong_up],
+    marker="^",
+    color="red",
+    s=60,
+    label="False UP"
+)
+
+# 4) Correct DOWN predictions (true=0, pred=0)
+mask_correct_down = (df_vis["true_dir"] == 0) & (df_vis["pred_dir"] == 0)
+plt.scatter(
+    df_vis.index[mask_correct_down],
+    df_vis["close"][mask_correct_down],
+    marker="v",
+    color="blue",
+    s=60,
+    label="Correct DOWN"
+)
+
+# 5) Wrong DOWN predictions (true=1, pred=0)
+mask_wrong_down = (df_vis["true_dir"] == 1) & (df_vis["pred_dir"] == 0)
+plt.scatter(
+    df_vis.index[mask_wrong_down],
+    df_vis["close"][mask_wrong_down],
+    marker="v",
+    color="orange",
+    s=60,
+    label="False DOWN"
+)
+
+plt.title("NVDA Price vs Model Predictions (Test Set)")
+plt.xlabel("Date")
+plt.ylabel("Price")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
 
