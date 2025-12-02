@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# Finnhub: d4m5t5hr01qjidhtok10d4m5t5hr01qjidhtok1g
-
 # In[1]:
 
 
@@ -16,7 +14,7 @@ from scipy.special import softmax
 from pandas.tseries.offsets import BDay
 
 
-# In[3]:
+# In[2]:
 
 
 # ------------------- CONFIG -------------------
@@ -587,7 +585,7 @@ print("Done.")
 
 # # Modeling
 
-# In[4]:
+# In[3]:
 
 
 # --------- load prerequisites from disk (so we don't need steps 1–3) ---------
@@ -595,7 +593,7 @@ df_results = pd.read_csv(os.path.join(OUT_DIR, "nvda_news_lagged_results.csv"))
 df_price   = pd.read_csv(os.path.join(OUT_DIR, "price_data.csv"))
 
 
-# In[5]:
+# In[4]:
 
 
 # ================================
@@ -702,7 +700,7 @@ print("Feature panel 'feat' ready. Shape:", feat.shape)
 print("Columns:", feat.columns.tolist())
 
 
-# In[6]:
+# In[5]:
 
 
 # ================================
@@ -732,7 +730,7 @@ print("Class distribution (0=down, 1=up):")
 print(bin_df["y_bin"].value_counts())
 
 
-# In[7]:
+# In[6]:
 
 
 # ================================
@@ -777,7 +775,7 @@ print("Train class distribution:", y_train.value_counts().to_dict())
 print("Test class distribution:", y_test.value_counts().to_dict())
 
 
-# In[8]:
+# In[7]:
 
 
 # ================================
@@ -852,7 +850,7 @@ print("\nClassification report:")
 print(classification_report(y_test, y_pred, digits=3))
 
 
-# In[9]:
+# In[8]:
 
 
 # ================================
@@ -896,248 +894,252 @@ print(classification_report(y_test, y_pred_rf, digits=3))
 # In[ ]:
 
 
-import random
-import pandas as pd
-import os
+# import random
+# import pandas as pd
+# import os
 
-summary_txt_path = os.path.join(OUT_DIR, "nvda_summary_report.txt")
+# summary_txt_path = os.path.join(OUT_DIR, "nvda_summary_report.txt")
 
-with open(summary_txt_path, "w", encoding="utf-8") as f:
-    def write_and_print(line=""):
-        print(line)
-        f.write(line + "\n")
+# with open(summary_txt_path, "w", encoding="utf-8") as f:
+#     def write_and_print(line=""):
+#         print(line)
+#         f.write(line + "\n")
 
-    write_and_print("=== NVDA Stock Sentiment Impact Summary ===\n")
+#     write_and_print("=== NVDA Stock Sentiment Impact Summary ===\n")
 
-    # ---------------------------
-    # 1) Correlation / lag summary
-    # ---------------------------
-    if not df_summary.empty:
-        best_row = df_summary.loc[df_summary['pearson_r'].abs().idxmax()]
-        best_corr_lag = int(best_row["lag_days"])
-        best_corr_val = best_row["pearson_r"]
+#     # ---------------------------
+#     # 1) Correlation / lag summary
+#     # ---------------------------
+#     if not df_summary.empty:
+#         best_row = df_summary.loc[df_summary['pearson_r'].abs().idxmax()]
+#         best_corr_lag = int(best_row["lag_days"])
+#         best_corr_val = best_row["pearson_r"]
 
-        write_and_print(
-            f"Overall, the strongest correlation between news sentiment "
-            f"and stock price change is at a lag of {best_corr_lag} trading days."
-        )
-        write_and_print(f"Correlation coefficient at this lag: {best_corr_val:.3f}\n")
-    else:
-        write_and_print("No valid lag correlation results to summarize.\n")
+#         write_and_print(
+#             f"Overall, the strongest correlation between news sentiment "
+#             f"and stock price change is at a lag of {best_corr_lag} trading days."
+#         )
+#         write_and_print(f"Correlation coefficient at this lag: {best_corr_val:.3f}\n")
+#     else:
+#         write_and_print("No valid lag correlation results to summarize.\n")
 
-    # ---------------------------
-    # 2) Example article impacts
-    # ---------------------------
-    # Ensure best_lag_days / best_lag_pct_change exist
-    needed_cols = {"best_lag_days", "best_lag_pct_change"}
-    if not needed_cols.issubset(df_results.columns):
-        # try to reload from the enriched CSV if it exists
-        bestlag_path = os.path.join(OUT_DIR, "nvda_news_lagged_results_with_bestlag.csv")
-        if os.path.exists(bestlag_path):
-            write_and_print(f"Reloading df_results from {bestlag_path} to get best-lag columns.")
-            df_results = pd.read_csv(bestlag_path)
-        else:
-            write_and_print(
-                "Per-article best lag columns not found and "
-                "'nvda_news_lagged_results_with_bestlag.csv' is missing.\n"
-                "Skipping example article impacts section.\n"
-            )
-            valid_articles = pd.DataFrame()  # empty
-    # After reload attempt, check again
-    if needed_cols.issubset(df_results.columns):
-        valid_articles = df_results.dropna(subset=["best_lag_days", "best_lag_pct_change"])
-    else:
-        valid_articles = pd.DataFrame()
+#     # ---------------------------
+#     # 2) Example article impacts
+#     # ---------------------------
+#     # Ensure best_lag_days / best_lag_pct_change exist
+#     needed_cols = {"best_lag_days", "best_lag_pct_change"}
+#     if not needed_cols.issubset(df_results.columns):
+#         # try to reload from the enriched CSV if it exists
+#         bestlag_path = os.path.join(OUT_DIR, "nvda_news_lagged_results_with_bestlag.csv")
+#         if os.path.exists(bestlag_path):
+#             write_and_print(f"Reloading df_results from {bestlag_path} to get best-lag columns.")
+#             df_results = pd.read_csv(bestlag_path)
+#         else:
+#             write_and_print(
+#                 "Per-article best lag columns not found and "
+#                 "'nvda_news_lagged_results_with_bestlag.csv' is missing.\n"
+#                 "Skipping example article impacts section.\n"
+#             )
+#             valid_articles = pd.DataFrame()  # empty
+#     # After reload attempt, check again
+#     if needed_cols.issubset(df_results.columns):
+#         valid_articles = df_results.dropna(subset=["best_lag_days", "best_lag_pct_change"])
+#     else:
+#         valid_articles = pd.DataFrame()
 
-    write_and_print(f"Number of articles with valid impact data: {len(valid_articles)}\n")
+#     write_and_print(f"Number of articles with valid impact data: {len(valid_articles)}\n")
 
-    if len(valid_articles) == 0:
-        write_and_print("No articles with valid impact data to show examples.\n")
-    else:
-        sample_size = min(5, len(valid_articles))
-        examples = valid_articles.sample(sample_size, random_state=None)
-        write_and_print(f"Showing {sample_size} example news impacts:\n")
+#     if len(valid_articles) == 0:
+#         write_and_print("No articles with valid impact data to show examples.\n")
+#     else:
+#         sample_size = min(5, len(valid_articles))
+#         examples = valid_articles.sample(sample_size, random_state=None)
+#         write_and_print(f"Showing {sample_size} example news impacts:\n")
 
-        for _, row in examples.iterrows():
-            try:
-                best_lag_days = int(row["best_lag_days"])
-                trading_date_col = f"trading_date_{best_lag_days}d"
-                pct_change_col = f"pct_change_{best_lag_days}d"
+#         for _, row in examples.iterrows():
+#             try:
+#                 best_lag_days = int(row["best_lag_days"])
+#                 trading_date_col = f"trading_date_{best_lag_days}d"
+#                 pct_change_col = f"pct_change_{best_lag_days}d"
 
-                pub_date = pd.to_datetime(row["pub_date"]).date()
-                impact_date = row.get(trading_date_col, None)
-                impact_pct = row.get(pct_change_col, None)
+#                 pub_date = pd.to_datetime(row["pub_date"]).date()
+#                 impact_date = row.get(trading_date_col, None)
+#                 impact_pct = row.get(pct_change_col, None)
 
-                write_and_print(
-                    f"- Lag days: "
-                    f"{pd.to_datetime(impact_date).date() - pub_date if pd.notnull(impact_date) else 'N/A'}"
-                )
-                write_and_print(f"  News Date: {pub_date}")
+#                 write_and_print(
+#                     f"- Lag days: "
+#                     f"{pd.to_datetime(impact_date).date() - pub_date if pd.notnull(impact_date) else 'N/A'}"
+#                 )
+#                 write_and_print(f"  News Date: {pub_date}")
 
-                if pd.notnull(impact_date):
-                    write_and_print(
-                        f"  Impact Date ({best_lag_days} trading days later): "
-                        f"{pd.to_datetime(impact_date).date()}"
-                    )
-                else:
-                    write_and_print(f"  Impact Date ({best_lag_days} trading days later): N/A")
+#                 if pd.notnull(impact_date):
+#                     write_and_print(
+#                         f"  Impact Date ({best_lag_days} trading days later): "
+#                         f"{pd.to_datetime(impact_date).date()}"
+#                     )
+#                 else:
+#                     write_and_print(f"  Impact Date ({best_lag_days} trading days later): N/A")
 
-                write_and_print(f"  Headline: {row.get('headline', 'N/A')}")
+#                 write_and_print(f"  Headline: {row.get('headline', 'N/A')}")
 
-                if pd.notnull(impact_pct):
-                    write_and_print(f"  Price Change: {impact_pct*100:.2f}%\n")
-                else:
-                    write_and_print("  Price Change: N/A (no data)\n")
-            except Exception as e:
-                write_and_print(f"  Skipped an example due to error: {e}\n")
+#                 if pd.notnull(impact_pct):
+#                     write_and_print(f"  Price Change: {impact_pct*100:.2f}%\n")
+#                 else:
+#                     write_and_print("  Price Change: N/A (no data)\n")
+#             except Exception as e:
+#                 write_and_print(f"  Skipped an example due to error: {e}\n")
 
-    # ---------------------------
-    # 3) ML model results summary
-    # ---------------------------
-    def write_model_summary(name, result_dict, fold_metrics=None):
-        write_and_print(f"\n=== {name} Model Summary ===")
-        if result_dict is None:
-            write_and_print("No results available.\n")
-            return
+#     # ---------------------------
+#     # 3) ML model results summary
+#     # ---------------------------
+#     def write_model_summary(name, result_dict, fold_metrics=None):
+#         write_and_print(f"\n=== {name} Model Summary ===")
+#         if result_dict is None:
+#             write_and_print("No results available.\n")
+#             return
 
-        write_and_print(f"Hyperparameters: {result_dict.get('params', {})}")
-        write_and_print(f"Average Accuracy: {result_dict.get('avg_acc', 0):.3f}")
-        write_and_print(f"Average Precision: {result_dict.get('avg_prec', 0):.3f}")
-        write_and_print(f"Average Recall: {result_dict.get('avg_rec', 0):.3f}")
-        write_and_print(f"Average F1 Score: {result_dict.get('avg_f1', 0):.3f}")
-        write_and_print(f"Average MAE (timing prediction): {result_dict.get('avg_mae', 0):.3f}")
-        write_and_print(f"Average MAPE (timing prediction): {result_dict.get('avg_mape', 0):.2f}%")
-        write_and_print(f"Cumulative pseudo-return: {result_dict.get('avg_cumret_sum', 0):.3f}")
+#         write_and_print(f"Hyperparameters: {result_dict.get('params', {})}")
+#         write_and_print(f"Average Accuracy: {result_dict.get('avg_acc', 0):.3f}")
+#         write_and_print(f"Average Precision: {result_dict.get('avg_prec', 0):.3f}")
+#         write_and_print(f"Average Recall: {result_dict.get('avg_rec', 0):.3f}")
+#         write_and_print(f"Average F1 Score: {result_dict.get('avg_f1', 0):.3f}")
+#         write_and_print(f"Average MAE (timing prediction): {result_dict.get('avg_mae', 0):.3f}")
+#         write_and_print(f"Average MAPE (timing prediction): {result_dict.get('avg_mape', 0):.2f}%")
+#         write_and_print(f"Cumulative pseudo-return: {result_dict.get('avg_cumret_sum', 0):.3f}")
 
-        # Include confusion matrix if fold_metrics provided
-        if fold_metrics:
-            total_cm = None
-            for m in fold_metrics:
-                cm = m.get("cm")
-                if cm is not None:
-                    if total_cm is None:
-                        total_cm = cm
-                    else:
-                        total_cm += cm
-            if total_cm is not None:
-                write_and_print("Aggregated Confusion Matrix (rows=true, cols=pred):")
-                write_and_print(str(total_cm))
-        write_and_print("")  # blank line
+#         # Include confusion matrix if fold_metrics provided
+#         if fold_metrics:
+#             total_cm = None
+#             for m in fold_metrics:
+#                 cm = m.get("cm")
+#                 if cm is not None:
+#                     if total_cm is None:
+#                         total_cm = cm
+#                     else:
+#                         total_cm += cm
+#             if total_cm is not None:
+#                 write_and_print("Aggregated Confusion Matrix (rows=true, cols=pred):")
+#                 write_and_print(str(total_cm))
+#         write_and_print("")  # blank line
 
-    write_model_summary("LSTM", best_lstm, fold_metrics=lstm_fold_metrics)
-    write_model_summary("Transformer", best_trf, fold_metrics=trf_fold_metrics)
+#     write_model_summary("LSTM", best_lstm, fold_metrics=lstm_fold_metrics)
+#     write_model_summary("Transformer", best_trf, fold_metrics=trf_fold_metrics)
 
-    # Hybrid timing model
-    write_and_print("=== Hybrid Timing Model Summary ===")
-    if best_hybrid is not None:
-        write_and_print(f"Best regularization C: {best_hybrid.get('C')}")
-        write_and_print(f"Average F1 score: {best_hybrid.get('f1',0):.3f}\n")
-    else:
-        write_and_print("No hybrid timing model results available.\n")
+#     # Hybrid timing model
+#     write_and_print("=== Hybrid Timing Model Summary ===")
+#     if best_hybrid is not None:
+#         write_and_print(f"Best regularization C: {best_hybrid.get('C')}")
+#         write_and_print(f"Average F1 score: {best_hybrid.get('f1',0):.3f}\n")
+#     else:
+#         write_and_print("No hybrid timing model results available.\n")
 
-    # ---------------------------
-    # 4) Notes
-    # ---------------------------
-    write_and_print(
-        "Note: Price change is calculated as the percentage change in closing price "
-        "relative to the closing price on or just after the news publication date."
-    )
-    write_and_print(
-        "The impact delay (lag) indicates how many trading days after news publication "
-        "the stock price shows the strongest per-article reaction."
-    )
-    write_and_print(
-        "ML model metrics summarize predictive performance on classification of price direction "
-        "and timing of movements (MAE for continuous return prediction)."
-    )
-    write_and_print(f"\nDetailed impact summary saved to: {summary_txt_path}")
+#     # ---------------------------
+#     # 4) Notes
+#     # ---------------------------
+#     write_and_print(
+#         "Note: Price change is calculated as the percentage change in closing price "
+#         "relative to the closing price on or just after the news publication date."
+#     )
+#     write_and_print(
+#         "The impact delay (lag) indicates how many trading days after news publication "
+#         "the stock price shows the strongest per-article reaction."
+#     )
+#     write_and_print(
+#         "ML model metrics summarize predictive performance on classification of price direction "
+#         "and timing of movements (MAE for continuous return prediction)."
+#     )
+#     write_and_print(f"\nDetailed impact summary saved to: {summary_txt_path}")
 
 
 # In[ ]:
 
 
-import pandas as pd
-import matplotlib.pyplot as plt
-from pandas.plotting import table
+# import pandas as pd
+# import matplotlib.pyplot as plt
+# from pandas.plotting import table
 
-# --- Collect results dynamically ---
-models = []
+# # --- Collect results dynamically ---
+# models = []
 
-# LSTM
-if best_lstm is not None:
-    models.append({
-        "Model": "LSTM",
-        "Accuracy": best_lstm.get("avg_acc", 0),
-        "Precision": best_lstm.get("avg_prec", 0),
-        "Recall": best_lstm.get("avg_rec", 0),
-        "F1 Score": best_lstm.get("avg_f1", 0),
-        "MAE": best_lstm.get("avg_mae", 0),
-        "MAPE (%)": best_lstm.get("avg_mape", 0),
-        "Cumulative Return": best_lstm.get("avg_cumret_sum", 0)
-    })
+# # LSTM
+# if best_lstm is not None:
+#     models.append({
+#         "Model": "LSTM",
+#         "Accuracy": best_lstm.get("avg_acc", 0),
+#         "Precision": best_lstm.get("avg_prec", 0),
+#         "Recall": best_lstm.get("avg_rec", 0),
+#         "F1 Score": best_lstm.get("avg_f1", 0),
+#         "MAE": best_lstm.get("avg_mae", 0),
+#         "MAPE (%)": best_lstm.get("avg_mape", 0),
+#         "Cumulative Return": best_lstm.get("avg_cumret_sum", 0)
+#     })
 
-# Transformer
-if best_trf is not None:
-    models.append({
-        "Model": "Transformer",
-        "Accuracy": best_trf.get("avg_acc", 0),
-        "Precision": best_trf.get("avg_prec", 0),
-        "Recall": best_trf.get("avg_rec", 0),
-        "F1 Score": best_trf.get("avg_f1", 0),
-        "MAE": best_trf.get("avg_mae", 0),
-        "MAPE (%)": best_trf.get("avg_mape", 0),
-        "Cumulative Return": best_trf.get("avg_cumret_sum", 0)
-    })
+# # Transformer
+# if best_trf is not None:
+#     models.append({
+#         "Model": "Transformer",
+#         "Accuracy": best_trf.get("avg_acc", 0),
+#         "Precision": best_trf.get("avg_prec", 0),
+#         "Recall": best_trf.get("avg_rec", 0),
+#         "F1 Score": best_trf.get("avg_f1", 0),
+#         "MAE": best_trf.get("avg_mae", 0),
+#         "MAPE (%)": best_trf.get("avg_mape", 0),
+#         "Cumulative Return": best_trf.get("avg_cumret_sum", 0)
+#     })
 
-# Hybrid timing model (optional)
-if best_hybrid is not None:
-    models.append({
-        "Model": "Hybrid",
-        "Accuracy": None,
-        "Precision": None,
-        "Recall": None,
-        "F1 Score": best_hybrid.get("f1", 0),
-        "MAE": None,
-        "MAPE (%)": None,
-        "Cumulative Return": None
-    })
+# # Hybrid timing model (optional)
+# if best_hybrid is not None:
+#     models.append({
+#         "Model": "Hybrid",
+#         "Accuracy": None,
+#         "Precision": None,
+#         "Recall": None,
+#         "F1 Score": best_hybrid.get("f1", 0),
+#         "MAE": None,
+#         "MAPE (%)": None,
+#         "Cumulative Return": None
+#     })
 
-# --- Convert to DataFrame ---
-df_models = pd.DataFrame(models).set_index("Model")
+# # --- Convert to DataFrame ---
+# df_models = pd.DataFrame(models).set_index("Model")
 
-# --- 1) Display graphical table ---
-fig, ax = plt.subplots(figsize=(10, 2))
-ax.axis("off")
-tbl = table(ax, df_models.round(3), loc="center", cellLoc="center")
-tbl.auto_set_font_size(False)
-tbl.set_fontsize(10)
-tbl.scale(1, 1.5)
-plt.title("Model Performance Table", fontsize=12)
-plt.show()
+# # --- 1) Display graphical table ---
+# fig, ax = plt.subplots(figsize=(10, 2))
+# ax.axis("off")
+# tbl = table(ax, df_models.round(3), loc="center", cellLoc="center")
+# tbl.auto_set_font_size(False)
+# tbl.set_fontsize(10)
+# tbl.scale(1, 1.5)
+# plt.title("Model Performance Table", fontsize=12)
+# plt.show()
 
-# --- 2) Plot grouped bar chart ---
-metrics_to_plot = ["Accuracy", "Precision", "Recall", "F1 Score", "MAPE (%)", "Cumulative Return"]
-df_plot = df_models[metrics_to_plot]
+# # --- 2) Plot grouped bar chart ---
+# metrics_to_plot = ["Accuracy", "Precision", "Recall", "F1 Score", "MAPE (%)", "Cumulative Return"]
+# df_plot = df_models[metrics_to_plot]
 
-ax = df_plot.plot(kind="bar", figsize=(12, 6))
-plt.title("Model Performance Comparison")
-plt.ylabel("Score / % / Return")
-plt.xticks(rotation=0)
-plt.legend(title="Metrics")
-plt.grid(axis="y", linestyle="--", alpha=0.7)
-plt.tight_layout()
-plt.show()
+# ax = df_plot.plot(kind="bar", figsize=(12, 6))
+# plt.title("Model Performance Comparison")
+# plt.ylabel("Score / % / Return")
+# plt.xticks(rotation=0)
+# plt.legend(title="Metrics")
+# plt.grid(axis="y", linestyle="--", alpha=0.7)
+# plt.tight_layout()
+# plt.show()
 
 
-# In[10]:
+# In[14]:
 
 
 # ================================
 # Confusion matrix heatmap — Random Forest (H=1d, real model)
 # ================================
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
+
+# Ensure outputs directory exists
+os.makedirs("outputs", exist_ok=True)
 
 # Use real test labels and RF predictions
 y_true_real = y_test
@@ -1170,84 +1172,279 @@ ax.set_yticks([0, 1])
 ax.set_xticklabels(["Pred 0 (Down)", "Pred 1 (Up)"], rotation=45, ha="right")
 ax.set_yticklabels(["True 0 (Down)", "True 1 (Up)"])
 
-ax.set_title("Random Forest (H=1d) — Confusion Matrix (Real Model)")
+ax.set_title("Random Forest (H=1d) — Confusion Matrix")
 ax.set_xlabel("Predicted label")
 ax.set_ylabel("True label")
 
 plt.tight_layout()
+
+# --- SAVE PNG ---
+save_path = "outputs/confusion_matrix_rf.png"
+plt.savefig(save_path, dpi=300)
+print(f"[Saved] {save_path}")
+
+# --- DISPLAY ---
 plt.show()
 
 
-# In[11]:
+# In[20]:
 
 
-# ================================
-# RF vs Logistic — metric comparison (H=1d, real models)
-# ================================
+# ============================
+# RF vs Logistic — metric bar chart (REAL metrics from current run)
+# ============================
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-)
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+# Ensure outputs directory exists
+os.makedirs("outputs", exist_ok=True)
+
+# --- Recompute metrics from real predictions ---
+
+# Logistic Regression (logreg_clf, y_pred, y_test must exist from previous cell)
+acc_lr  = accuracy_score(y_test, y_pred)
+prec_lr = precision_score(y_test, y_pred)
+rec_lr  = recall_score(y_test, y_pred)
+f1_lr   = f1_score(y_test, y_pred)
+
+# Random Forest (rf, y_pred_rf, y_test must exist from previous cell)
+acc_rf  = accuracy_score(y_test, y_pred_rf)
+prec_rf = precision_score(y_test, y_pred_rf)
+rec_rf  = recall_score(y_test, y_pred_rf)
+f1_rf   = f1_score(y_test, y_pred_rf)
 
 models = ["LogReg", "RandomForest"]
 
-# Logistic Regression metrics (using current best logreg_clf)
-y_pred_log = logreg_clf.predict(X_test)
+acc_vals  = [acc_lr,  acc_rf]
+prec_vals = [prec_lr, prec_rf]
+rec_vals  = [rec_lr,  rec_rf]
+f1_vals   = [f1_lr,   f1_rf]
 
-acc_log  = accuracy_score(y_test, y_pred_log)
-prec_log = precision_score(y_test, y_pred_log, zero_division=0)
-rec_log  = recall_score(y_test, y_pred_log, zero_division=0)
-f1_log   = f1_score(y_test, y_pred_log, zero_division=0)
-
-# Random Forest metrics (using current rf and y_pred_rf)
-acc_rf  = accuracy_score(y_test, y_pred_rf)
-prec_rf = precision_score(y_test, y_pred_rf, zero_division=0)
-rec_rf  = recall_score(y_test, y_pred_rf, zero_division=0)
-f1_rf   = f1_score(y_test, y_pred_rf, zero_division=0)
-
-acc_vals  = [acc_log,  acc_rf]
-prec_vals = [prec_log, prec_rf]
-rec_vals  = [rec_log,  rec_rf]
-f1_vals   = [f1_log,   f1_rf]
-
-x = np.arange(len(models))  # [0, 1]
+x = np.arange(len(models))  # positions
 width = 0.2
 
-fig, ax = plt.subplots(figsize=(8, 5))
+fig, ax = plt.subplots(figsize=(7, 4))
 
+# Bars
 ax.bar(x - 1.5*width, acc_vals,  width, label="Accuracy")
 ax.bar(x - 0.5*width, prec_vals, width, label="Precision")
 ax.bar(x + 0.5*width, rec_vals,  width, label="Recall")
-ax.bar(x + 1.5*width, f1_vals,   width, label="F1 score")
+ax.bar(x + 1.5*width, f1_vals,   width, label="F1 Score")
 
+# Labels & formatting
 ax.set_xticks(x)
 ax.set_xticklabels(models)
 ax.set_ylim(0, 1.0)
-
 ax.set_ylabel("Score")
-ax.set_title("H=1d — Logistic Regression vs Random Forest (Real Models)")
-ax.legend(loc="upper right")
-
-for i, vals in enumerate([acc_vals, prec_vals, rec_vals, f1_vals]):
-    for j, v in enumerate(vals):
-        ax.text(
-            j + (i - 1.5)*width,
-            v + 0.01,
-            f"{v:.2f}",
-            ha="center",
-            va="bottom",
-            fontsize=8,
-        )
+ax.set_title("H=1d — Logistic Regression vs Random Forest")
+ax.legend(loc="lower right")
+ax.grid(axis="y", alpha=0.3)
 
 plt.tight_layout()
+
+# ---- SAVE PNG ----
+save_path = "outputs/model_comparison_rf_vs_logreg.png"
+plt.savefig(save_path, dpi=300)
+print(f"[Saved] {save_path}")
+
+# ---- DISPLAY ----
+plt.show()
+
+print("LogReg metrics:",
+      f"acc={acc_lr:.3f}, prec={prec_lr:.3f}, rec={rec_lr:.3f}, f1={f1_lr:.3f}")
+print("RF metrics     :",
+      f"acc={acc_rf:.3f}, prec={prec_rf:.3f}, rec={rec_rf:.3f}, f1={f1_rf:.3f}")
+
+
+# In[21]:
+
+
+import os
+import matplotlib.pyplot as plt
+
+# ================================
+# Price chart with model predictions (Logistic, H=1d)
+# ================================
+
+# Ensure outputs directory exists
+os.makedirs("outputs", exist_ok=True)
+
+plt.figure(figsize=(12, 6))
+
+# 1) Price line
+plt.plot(df_vis.index, df_vis["close"], label="NVDA Close Price")
+
+# 2) Correct UP predictions (true=1, pred=1)
+mask_correct_up = (df_vis["true_dir"] == 1) & (df_vis["pred_dir"] == 1)
+plt.scatter(
+    df_vis.index[mask_correct_up],
+    df_vis["close"][mask_correct_up],
+    marker="^",
+    color="green",
+    s=60,
+    label="Correct UP"
+)
+
+# 3) Wrong UP predictions (true=0, pred=1)
+mask_wrong_up = (df_vis["true_dir"] == 0) & (df_vis["pred_dir"] == 1)
+plt.scatter(
+    df_vis.index[mask_wrong_up],
+    df_vis["close"][mask_wrong_up],
+    marker="^",
+    color="red",
+    s=60,
+    label="False UP"
+)
+
+# 4) Correct DOWN predictions (true=0, pred=0)
+mask_correct_down = (df_vis["true_dir"] == 0) & (df_vis["pred_dir"] == 0)
+plt.scatter(
+    df_vis.index[mask_correct_down],
+    df_vis["close"][mask_correct_down],
+    marker="v",
+    color="blue",
+    s=60,
+    label="Correct DOWN"
+)
+
+# 5) Wrong DOWN predictions (true=1, pred=0)
+mask_wrong_down = (df_vis["true_dir"] == 1) & (df_vis["pred_dir"] == 0)
+plt.scatter(
+    df_vis.index[mask_wrong_down],
+    df_vis["close"][mask_wrong_down],
+    marker="v",
+    color="orange",
+    s=60,
+    label="False DOWN"
+)
+
+plt.title("NVDA Price vs Model Predictions (Test Set, Logistic Regression)")
+plt.xlabel("Date")
+plt.ylabel("Price")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+
+# ---- SAVE PNG ----
+save_path = os.path.join("outputs", "price_vs_predictions_logreg.png")
+plt.savefig(save_path, dpi=300)
+print(f"[Saved] {save_path}")
+
+# ---- DISPLAY ----
 plt.show()
 
 
-# In[12]:
+# In[22]:
+
+
+# ================================
+# Price chart with Random Forest predictions (H=1d, real model)
+# ================================
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Ensure outputs directory exists
+os.makedirs("outputs", exist_ok=True)
+
+# --- 1) Reconstruct test index to align with prices ---
+# bin_df_model was used to build X, y in the same order
+idx_all = bin_df_model.index
+test_idx = idx_all[split_idx:]   # last 20% used as test
+
+# Auto-detect close column (same logic as in feature engineering)
+close_candidates = [c for c in feat.columns if c.startswith("close")]
+if len(close_candidates) == 0:
+    raise ValueError(f"No 'close*' column found in feat.columns: {feat.columns.tolist()}")
+close_col = close_candidates[0]
+
+# Get price series for the test window (align by index)
+price_test = feat.loc[test_idx, close_col]
+
+# Sanity check: lengths must match
+if len(price_test) != len(y_test):
+    raise ValueError(
+        f"Length mismatch: price_test={len(price_test)}, y_test={len(y_test)}. "
+        "Check that bin_df_model and feat share the same date index ordering."
+    )
+
+# Build visualization DataFrame
+df_vis_rf = pd.DataFrame({
+    "close": price_test,
+    "true_dir": y_test,         # 0 = down, 1 = up
+    "pred_dir": y_pred_rf,      # RF predicted labels
+    "proba_up": y_proba_rf      # RF predicted probability of UP
+}, index=price_test.index)
+
+# --- 2) Plot price + prediction markers ---
+plt.figure(figsize=(12, 6))
+
+# 1) Price line
+plt.plot(df_vis_rf.index, df_vis_rf["close"], label="NVDA Close Price")
+
+# 2) Correct UP predictions (true=1, pred=1)
+mask_correct_up = (df_vis_rf["true_dir"] == 1) & (df_vis_rf["pred_dir"] == 1)
+plt.scatter(
+    df_vis_rf.index[mask_correct_up],
+    df_vis_rf["close"][mask_correct_up],
+    marker="^",
+    color="green",
+    s=60,
+    label="Correct UP"
+)
+
+# 3) Wrong UP predictions (true=0, pred=1)
+mask_wrong_up = (df_vis_rf["true_dir"] == 0) & (df_vis_rf["pred_dir"] == 1)
+plt.scatter(
+    df_vis_rf.index[mask_wrong_up],
+    df_vis_rf["close"][mask_wrong_up],
+    marker="^",
+    color="red",
+    s=60,
+    label="False UP"
+)
+
+# 4) Correct DOWN predictions (true=0, pred=0)
+mask_correct_down = (df_vis_rf["true_dir"] == 0) & (df_vis_rf["pred_dir"] == 0)
+plt.scatter(
+    df_vis_rf.index[mask_correct_down],
+    df_vis_rf["close"][mask_correct_down],
+    marker="v",
+    color="blue",
+    s=60,
+    label="Correct DOWN"
+)
+
+# 5) Wrong DOWN predictions (true=1, pred=0)
+mask_wrong_down = (df_vis_rf["true_dir"] == 1) & (df_vis_rf["pred_dir"] == 0)
+plt.scatter(
+    df_vis_rf.index[mask_wrong_down],
+    df_vis_rf["close"][mask_wrong_down],
+    marker="v",
+    color="orange",
+    s=60,
+    label="False DOWN"
+)
+
+plt.title("NVDA Price vs Random Forest Predictions (Test Set, H=1d)")
+plt.xlabel("Date")
+plt.ylabel("Price")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+
+# ---- SAVE PNG ----
+save_path = os.path.join("outputs", "price_vs_predictions_rf.png")
+plt.savefig(save_path, dpi=300)
+print(f"[Saved] {save_path}")
+
+# ---- DISPLAY ----
+plt.show()
+
+
+# In[18]:
 
 
 # ================================
@@ -1270,7 +1467,7 @@ df_vis["proba_up"] = y_proba                # predicted probability of UP
 print(df_vis.head())
 
 
-# In[13]:
+# In[19]:
 
 
 import matplotlib.pyplot as plt
